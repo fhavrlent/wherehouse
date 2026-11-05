@@ -1,0 +1,14 @@
+services:
+  wherehouse:
+    image: ghcr.io/fhavrlent/wherehouse:latest
+    container_name: wherehouse
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file: .env
+    volumes:
+      # Database and uploaded files. Back this up.
+      - wherehouse-data:/data
+
+volumes:
+  wherehouse-data:
