@@ -95,7 +95,7 @@ Apps such as Warranteed use Wherehouse with an API token from **Settings → API
 | `TZ` | | Timezone |
 | `WHEREHOUSE_NOTIFY_HOUR` | `9` | Hour (0–23) after which reminders are sent |
 | `WHEREHOUSE_NOTIFY_ALLOWED_HOSTS` | | Comma-separated hosts non-admins may use with self-hosted notification services |
-| `WHEREHOUSE_SECRET` | | Key for encrypting stored refresh tokens; generated in the data directory if unset |
+| `WHEREHOUSE_SECRET` | | Key for encrypting stored refresh tokens and Paperless tokens; generated in the data directory if unset |
 | `WHEREHOUSE_MAX_UPLOAD_MB` | `50` | Maximum upload size |
 | `WHEREHOUSE_SESSION_DAYS` | `30` | Session length |
 | `WHEREHOUSE_DATA_DIR` | `/data` | Database directory (local disk) |

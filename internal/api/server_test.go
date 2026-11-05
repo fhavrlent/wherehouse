@@ -19,6 +19,7 @@ import (
 	"github.com/fhavrlent/wherehouse/internal/auth"
 	"github.com/fhavrlent/wherehouse/internal/config"
 	"github.com/fhavrlent/wherehouse/internal/db"
+	"github.com/fhavrlent/wherehouse/internal/secret"
 	"github.com/fhavrlent/wherehouse/internal/store"
 )
 
@@ -66,11 +67,11 @@ func newTestEnv(t *testing.T, configure ...func(*config.Config)) *testEnv {
 		Location:   time.UTC,
 		DevLogin:   true,
 	}
-	st := store.New(database)
-	key, err := auth.LoadKey("test secret", dir)
+	key, err := secret.LoadKey("test secret", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
+	st := store.New(database, key)
 	assets := fstest.MapFS{"index.html": {Data: []byte("<!doctype html>")}}
 	files, err := NewFiles(filepath.Join(dir, "files"))
 	if err != nil {

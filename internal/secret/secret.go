@@ -1,4 +1,6 @@
-package auth
+// Package secret encrypts what is stored but must stay private: refresh
+// tokens and Paperless tokens.
+package secret
 
 import (
 	"crypto/aes"
@@ -16,7 +18,7 @@ import (
 	"strings"
 )
 
-// LoadKey returns the key used to encrypt stored refresh tokens: derived from
+// LoadKey returns the key used to encrypt stored secrets: derived from
 // secret when set, otherwise read from (or created in) dataDir/secret.key so
 // no configuration is needed.
 func LoadKey(secret, dataDir string) ([]byte, error) {
@@ -47,7 +49,8 @@ func LoadKey(secret, dataDir string) ([]byte, error) {
 	return k, nil
 }
 
-func encrypt(key []byte, plaintext string) (string, error) {
+// Encrypt seals plaintext with key; "" stays "".
+func Encrypt(key []byte, plaintext string) (string, error) {
 	if plaintext == "" {
 		return "", nil
 	}
@@ -62,7 +65,8 @@ func encrypt(key []byte, plaintext string) (string, error) {
 	return base64.RawStdEncoding.EncodeToString(gcm.Seal(nonce, nonce, []byte(plaintext), nil)), nil
 }
 
-func decrypt(key []byte, ciphertext string) (string, error) {
+// Decrypt opens what Encrypt sealed.
+func Decrypt(key []byte, ciphertext string) (string, error) {
 	raw, err := base64.RawStdEncoding.DecodeString(ciphertext)
 	if err != nil {
 		return "", err

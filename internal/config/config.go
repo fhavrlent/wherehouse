@@ -31,8 +31,8 @@ type Config struct {
 	OIDC      OIDC
 	Paperless Paperless
 
-	// Secret derives the key that encrypts stored refresh tokens. When empty,
-	// a key is generated in DataDir/secret.key.
+	// Secret derives the key that encrypts stored refresh tokens and
+	// Paperless tokens. When empty, a key is generated in DataDir/secret.key.
 	Secret string
 
 	// DevLogin enables a password-less local login without an identity

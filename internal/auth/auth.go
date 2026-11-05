@@ -19,6 +19,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/fhavrlent/wherehouse/internal/config"
+	"github.com/fhavrlent/wherehouse/internal/secret"
 	"github.com/fhavrlent/wherehouse/internal/store"
 )
 
@@ -335,7 +336,7 @@ func (a *Auth) startSession(w http.ResponseWriter, r *http.Request, userID int64
 				"and removed users keep access until then. Request the offline_access scope if your provider supports it.")
 		})
 	}
-	encRefresh, err := encrypt(a.key, refreshToken)
+	encRefresh, err := secret.Encrypt(a.key, refreshToken)
 	if err != nil {
 		return err
 	}
@@ -507,7 +508,7 @@ func (a *Auth) recheck(ctx context.Context, userID int64, sess *store.Session) (
 		return nil, nil
 	}
 
-	refresh, err := decrypt(a.key, sess.RefreshToken)
+	refresh, err := secret.Decrypt(a.key, sess.RefreshToken)
 	if err != nil {
 		return end("stored refresh token can't be decrypted (was the secret changed?)")
 	}
@@ -554,7 +555,7 @@ func (a *Auth) recheck(ctx context.Context, userID int64, sess *store.Session) (
 			return nil, err
 		}
 	}
-	encRefresh, err := encrypt(a.key, tok.RefreshToken)
+	encRefresh, err := secret.Encrypt(a.key, tok.RefreshToken)
 	if err != nil {
 		return nil, err
 	}

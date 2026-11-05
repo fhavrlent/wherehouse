@@ -137,7 +137,7 @@ func TestImport(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer database.Close()
-	st := store.New(database)
+	st := store.New(database, make([]byte, 32))
 	ctx := context.Background()
 	u, _ := st.UpsertUser(ctx, store.UpsertUser{Issuer: "test", Subject: "1"})
 	hh, err := st.CurrentHousehold(ctx, u.ID, "Home")

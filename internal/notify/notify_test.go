@@ -31,7 +31,7 @@ func TestRemindersFireOncePerThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer database.Close()
-	st := store.New(database)
+	st := store.New(database, make([]byte, 32))
 	ctx := context.Background()
 
 	// The first user is an admin, so any notification host is allowed.

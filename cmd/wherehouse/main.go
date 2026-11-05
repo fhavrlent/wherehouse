@@ -18,6 +18,7 @@ import (
 	"github.com/fhavrlent/wherehouse/internal/config"
 	"github.com/fhavrlent/wherehouse/internal/db"
 	"github.com/fhavrlent/wherehouse/internal/notify"
+	"github.com/fhavrlent/wherehouse/internal/secret"
 	"github.com/fhavrlent/wherehouse/internal/store"
 	"github.com/fhavrlent/wherehouse/web"
 )
@@ -60,15 +61,18 @@ func run() error {
 	}
 	defer database.Close()
 
-	st := store.New(database)
-	if err := st.RebuildSearch(context.Background()); err != nil {
-		return fmt.Errorf("search index: %w", err)
-	}
-	files, err := api.NewFiles(cfg.FilesDir)
+	key, err := secret.LoadKey(cfg.Secret, cfg.DataDir)
 	if err != nil {
 		return err
 	}
-	key, err := auth.LoadKey(cfg.Secret, cfg.DataDir)
+	st := store.New(database, key)
+	if err := st.RebuildSearch(context.Background()); err != nil {
+		return fmt.Errorf("search index: %w", err)
+	}
+	if err := st.SealPaperlessTokens(context.Background()); err != nil {
+		return fmt.Errorf("encrypt Paperless tokens: %w", err)
+	}
+	files, err := api.NewFiles(cfg.FilesDir)
 	if err != nil {
 		return err
 	}

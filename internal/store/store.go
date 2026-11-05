@@ -7,9 +7,12 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/fhavrlent/wherehouse/internal/i18n"
+	"github.com/fhavrlent/wherehouse/internal/secret"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -23,10 +26,11 @@ func invalid(key string, args i18n.Args) error {
 }
 
 type Store struct {
-	db *sql.DB
+	db  *sql.DB
+	key []byte // encrypts stored Paperless tokens
 }
 
-func New(db *sql.DB) *Store { return &Store{db: db} }
+func New(db *sql.DB, key []byte) *Store { return &Store{db: db, key: key} }
 
 func (s *Store) Ping(ctx context.Context) error { return s.db.PingContext(ctx) }
 
@@ -284,7 +288,15 @@ func (s *Store) Settings(ctx context.Context, userID int64) (*Settings, error) {
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
-	return &st, err
+	if err != nil {
+		return nil, err
+	}
+	// A token that can't be opened is of no use; the person enters it again.
+	if st.PaperlessToken, err = s.open(st.PaperlessToken); err != nil {
+		slog.Warn("stored Paperless token can't be decrypted (was the secret changed?)", "user", userID)
+		st.PaperlessToken = ""
+	}
+	return &st, nil
 }
 
 // EffectiveLanguage is the language to write to the user in when there is no
@@ -305,9 +317,71 @@ func (s *Store) SetBrowserLanguage(ctx context.Context, userID int64, lang strin
 }
 
 func (s *Store) SaveSettings(ctx context.Context, userID int64, st *Settings) error {
-	_, err := s.db.ExecContext(ctx,
+	token, err := s.seal(st.PaperlessToken)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx,
 		`UPDATE user_settings SET theme = ?, language = ?, notify_urls = ?, notify_days = ?, paperless_token = ?, paperless_backlinks = ?
 		WHERE user_id = ?`,
-		st.Theme, st.Language, st.NotifyURLs, st.NotifyDays, st.PaperlessToken, st.PaperlessBacklinks, userID)
+		st.Theme, st.Language, st.NotifyURLs, st.NotifyDays, token, st.PaperlessBacklinks, userID)
 	return err
+}
+
+// sealedPrefix marks an encrypted Paperless token. Tokens saved before they
+// were encrypted are plain text, and are read as they are.
+const sealedPrefix = "sealed:"
+
+func (s *Store) seal(token string) (string, error) {
+	if token == "" {
+		return "", nil
+	}
+	enc, err := secret.Encrypt(s.key, token)
+	if err != nil {
+		return "", err
+	}
+	return sealedPrefix + enc, nil
+}
+
+func (s *Store) open(stored string) (string, error) {
+	enc, ok := strings.CutPrefix(stored, sealedPrefix)
+	if !ok {
+		return stored, nil
+	}
+	return secret.Decrypt(s.key, enc)
+}
+
+// SealPaperlessTokens encrypts Paperless tokens still stored in plain text.
+func (s *Store) SealPaperlessTokens(ctx context.Context) error {
+	return s.withTx(ctx, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `SELECT user_id, paperless_token FROM user_settings
+			WHERE paperless_token != '' AND paperless_token NOT LIKE ?`, sealedPrefix+"%")
+		if err != nil {
+			return err
+		}
+		plain := map[int64]string{}
+		for rows.Next() {
+			var id int64
+			var token string
+			if err := rows.Scan(&id, &token); err != nil {
+				rows.Close()
+				return err
+			}
+			plain[id] = token
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		for id, token := range plain {
+			sealed, err := s.seal(token)
+			if err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `UPDATE user_settings SET paperless_token = ? WHERE user_id = ?`, sealed, id); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }

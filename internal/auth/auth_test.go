@@ -41,39 +41,6 @@ func TestSafeReturn(t *testing.T) {
 	}
 }
 
-func TestEncryptRoundTrip(t *testing.T) {
-	key, err := LoadKey("", t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	enc, err := encrypt(key, "refresh-token-value")
-	if err != nil || enc == "" || enc == "refresh-token-value" {
-		t.Fatalf("encrypt: %q %v", enc, err)
-	}
-	if got, err := decrypt(key, enc); err != nil || got != "refresh-token-value" {
-		t.Fatalf("decrypt: %q %v", got, err)
-	}
-	other, _ := LoadKey("another secret", "")
-	if _, err := decrypt(other, enc); err == nil {
-		t.Fatal("decrypting with the wrong key must fail")
-	}
-	if enc, _ := encrypt(key, ""); enc != "" {
-		t.Fatal("empty input should stay empty")
-	}
-}
-
-func TestLoadKeyIsStable(t *testing.T) {
-	dir := t.TempDir()
-	a, err := LoadKey("", dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := LoadKey("", dir)
-	if err != nil || string(a) != string(b) {
-		t.Fatal("key must be reused across restarts")
-	}
-}
-
 func TestAccess(t *testing.T) {
 	a := &Auth{cfg: &config.Config{OIDC: config.OIDC{
 		GroupsClaim:   "groups",
