@@ -79,3 +79,30 @@ func TestChangesHaveDocuments(t *testing.T) {
 		}
 	}
 }
+
+// A maintenance entry added, changed or deleted shows as a change to its
+// thing, so apps that keep their own entries there see it.
+func TestChangesHaveMaintenance(t *testing.T) {
+	h, c := newTestServer(t)
+	thing := add(t, h, c, `{"name":"Drill"}`)
+	var entry int64
+	for _, change := range []func(){
+		func() {
+			m := decodeAs[store.Maintenance](t, mustCall(t, h, c, "POST", fmt.Sprintf("/api/things/%d/maintenance", thing.ID),
+				`{"title":"Brushes","doneOn":"2026-03-01"}`, 201))
+			entry = m.ID
+		},
+		func() {
+			mustCall(t, h, c, "PUT", fmt.Sprintf("/api/maintenance/%d", entry), `{"title":"New brushes","doneOn":"2026-03-02"}`, 200)
+		},
+		func() { mustCall(t, h, c, "DELETE", fmt.Sprintf("/api/maintenance/%d", entry), "", 204) },
+	} {
+		until := decodeAs[store.Changes](t, mustCall(t, h, c, "GET", "/api/changes", "", 200)).Until
+		time.Sleep(1100 * time.Millisecond) // times are to the second
+		change()
+		ch := decodeAs[store.Changes](t, mustCall(t, h, c, "GET", "/api/changes?since="+url.QueryEscape(until), "", 200))
+		if len(ch.Things) != 1 || ch.Things[0].ID != thing.ID {
+			t.Errorf("changes = %+v", ch)
+		}
+	}
+}

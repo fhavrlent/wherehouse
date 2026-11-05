@@ -115,8 +115,10 @@ func (s *Store) AddMaintenance(ctx context.Context, hh, uid, thing int64, in Mai
 		if err != nil {
 			return err
 		}
-		id, err = res.LastInsertId()
-		return err
+		if id, err = res.LastInsertId(); err != nil {
+			return err
+		}
+		return touch(ctx, tx, thing)
 	})
 	if err != nil {
 		return nil, err
@@ -137,23 +139,36 @@ func (s *Store) UpdateMaintenance(ctx context.Context, hh, id int64, in Maintena
 	if err := in.normalize(); err != nil {
 		return nil, err
 	}
-	if _, err := s.GetMaintenance(ctx, hh, id); err != nil {
+	m, err := s.GetMaintenance(ctx, hh, id)
+	if err != nil {
 		return nil, err
 	}
-	if _, err := s.db.ExecContext(ctx, `
-		UPDATE maintenance SET title = ?, done_on = ?, next_due = ?, notes = ?, cost = ?, updated_at = ? WHERE id = ?`,
-		in.Title, in.DoneOn, in.NextDue, in.Notes, in.Cost, now(), id); err != nil {
+	err = s.withTx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE maintenance SET title = ?, done_on = ?, next_due = ?, notes = ?, cost = ?, updated_at = ? WHERE id = ?`,
+			in.Title, in.DoneOn, in.NextDue, in.Notes, in.Cost, now(), id); err != nil {
+			return err
+		}
+		// Apps reading the changes see it as a change to its thing.
+		return touch(ctx, tx, m.ThingID)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return s.GetMaintenance(ctx, hh, id)
 }
 
 func (s *Store) DeleteMaintenance(ctx context.Context, hh, id int64) error {
-	if _, err := s.GetMaintenance(ctx, hh, id); err != nil {
+	m, err := s.GetMaintenance(ctx, hh, id)
+	if err != nil {
 		return err
 	}
-	_, err := s.db.ExecContext(ctx, `DELETE FROM maintenance WHERE id = ?`, id)
-	return err
+	return s.withTx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM maintenance WHERE id = ?`, id); err != nil {
+			return err
+		}
+		return touch(ctx, tx, m.ThingID)
+	})
 }
 
 // DueMaintenance lists entries due on or before until (a date), soonest
