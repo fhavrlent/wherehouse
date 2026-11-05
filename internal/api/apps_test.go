@@ -56,3 +56,26 @@ func TestAppLinks(t *testing.T) {
 	mustCall(t, h, c, "GET", "/api/changes?since=yesterday", "", 400)
 	mustCall(t, h, c, "GET", "/api/homebox/nope", "", 404)
 }
+
+// Apps following the change feed see a document deleted or changed on a
+// thing, as they see a photo deleted.
+func TestChangesHaveDocuments(t *testing.T) {
+	h, c := newTestServer(t)
+	thing := add(t, h, c, `{"name":"Drill"}`)
+	doc := decodeAs[store.Attachment](t, upload(t, h, c, fmt.Sprintf("/api/things/%d/attachments", thing.ID),
+		map[string][]byte{"manual.pdf": []byte("%PDF-1.4 manual")}))
+	for _, change := range []func(){
+		func() {
+			mustCall(t, h, c, "PATCH", fmt.Sprintf("/api/attachments/%d", doc.ID), `{"kind":"warranty","filename":"card.pdf"}`, 200)
+		},
+		func() { mustCall(t, h, c, "DELETE", fmt.Sprintf("/api/attachments/%d", doc.ID), "", 204) },
+	} {
+		until := decodeAs[store.Changes](t, mustCall(t, h, c, "GET", "/api/changes", "", 200)).Until
+		time.Sleep(1100 * time.Millisecond) // times are to the second
+		change()
+		ch := decodeAs[store.Changes](t, mustCall(t, h, c, "GET", "/api/changes?since="+url.QueryEscape(until), "", 200))
+		if len(ch.Things) != 1 || ch.Things[0].ID != thing.ID {
+			t.Errorf("changes = %+v", ch)
+		}
+	}
+}

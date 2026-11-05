@@ -117,10 +117,17 @@ func (s *Store) UpdateAttachment(ctx context.Context, hh, id int64, kind, filena
 	if filename == "" {
 		return nil, invalid("attachmentName", nil)
 	}
-	if _, err := s.GetAttachment(ctx, hh, id); err != nil {
+	a, err := s.GetAttachment(ctx, hh, id)
+	if err != nil {
 		return nil, err
 	}
-	if _, err := s.db.ExecContext(ctx, `UPDATE attachments SET kind = ?, filename = ? WHERE id = ?`, kind, filename, id); err != nil {
+	err = s.withTx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `UPDATE attachments SET kind = ?, filename = ? WHERE id = ?`, kind, filename, id); err != nil {
+			return err
+		}
+		return touch(ctx, tx, a.ThingID)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return s.GetAttachment(ctx, hh, id)
@@ -133,7 +140,14 @@ func (s *Store) DeleteAttachment(ctx context.Context, hh, id int64) (*Attachment
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.db.ExecContext(ctx, `DELETE FROM attachments WHERE id = ?`, id); err != nil {
+	// Its thing changed: apps following the change feed learn it's gone.
+	err = s.withTx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM attachments WHERE id = ?`, id); err != nil {
+			return err
+		}
+		return touch(ctx, tx, a.ThingID)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return a, nil
