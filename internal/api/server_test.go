@@ -98,6 +98,18 @@ func call(h http.Handler, method, path, body string, c *http.Cookie) *httptest.R
 	return rec
 }
 
+// callWithToken makes a request with an API token instead of a session.
+func callWithToken(h http.Handler, method, path, body, token string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, "http://wherehouse.test"+path, strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
 func decodeAs[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
 	t.Helper()
 	var v T

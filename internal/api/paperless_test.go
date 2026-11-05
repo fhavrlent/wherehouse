@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -84,5 +85,69 @@ func TestPaperlessLinkBack(t *testing.T) {
 	json.Unmarshal(mustCall(t, h, c, "GET", "/api/settings", "", 200).Body.Bytes(), &got)
 	if got["paperlessBacklinks"] != true {
 		t.Errorf("settings = %v", got)
+	}
+}
+
+func TestTokenNeverUsesServerPaperless(t *testing.T) {
+	var mu sync.Mutex
+	var seen []string
+	pl := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		seen = append(seen, r.Header.Get("Authorization"))
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/documents/" {
+			w.Write([]byte(`{"count":0,"results":[]}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer pl.Close()
+	usedServerToken := func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, a := range seen {
+			if a == "Token server-token" {
+				return true
+			}
+		}
+		return false
+	}
+
+	e := newTestEnv(t, func(c *config.Config) {
+		c.Paperless = config.Paperless{URL: pl.URL, PublicURL: pl.URL, Token: "server-token"}
+	})
+	c := e.signIn(t, "a")
+	h := e.h
+	me := decodeAs[store.User](t, mustCall(t, h, c, "GET", "/api/me", "", 200))
+	if err := e.st.SetAdmin(context.Background(), me.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	token := decodeAs[createdToken](t, mustCall(t, h, c, "POST", "/api/tokens", `{"name":"App"}`, 201)).Secret
+
+	// The admin's token can't search with the server's Paperless token…
+	if rec := callWithToken(h, "GET", "/api/paperless/search", "", token); rec.Code != http.StatusBadRequest {
+		t.Errorf("search with a token = %d %s", rec.Code, rec.Body)
+	}
+	// …nor open a document the admin linked: it opens in Paperless instead.
+	tv := add(t, h, c, `{"name":"TV"}`)
+	hh := decodeAs[householdsResponse](t, mustCall(t, h, c, "GET", "/api/households", "", 200)).Current
+	doc := int64(7)
+	a := &store.Attachment{ThingID: tv.ID, Kind: "receipt", Storage: store.StoragePaperless, Filename: "r.pdf",
+		MimeType: "application/pdf", PaperlessDocID: &doc, AddedBy: &me.ID}
+	if err := e.st.AddAttachment(context.Background(), hh, a); err != nil {
+		t.Fatal(err)
+	}
+	if rec := callWithToken(h, "GET", fmt.Sprintf("/api/attachments/%d/file", a.ID), "", token); rec.Code != http.StatusFound {
+		t.Errorf("document with a token = %d", rec.Code)
+	}
+	if usedServerToken() {
+		t.Fatal("a token request used the server's Paperless token")
+	}
+
+	// The admin signed in still can.
+	mustCall(t, h, c, "GET", "/api/paperless/search", "", 200)
+	if !usedServerToken() {
+		t.Error("the admin's session didn't use the server's token")
 	}
 }

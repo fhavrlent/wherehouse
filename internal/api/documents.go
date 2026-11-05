@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fhavrlent/wherehouse/internal/auth"
 	"github.com/fhavrlent/wherehouse/internal/i18n"
 	"github.com/fhavrlent/wherehouse/internal/paperless"
 	"github.com/fhavrlent/wherehouse/internal/store"
@@ -33,14 +34,19 @@ func (s *Server) paperlessFor(st *store.Settings, admin bool) *paperless.Client 
 	return nil
 }
 
+// userPaperless returns the Paperless client of uid, who may be someone
+// other than the requester. A request with an API token never gets the
+// server's token, whoever's connection it uses.
 func (s *Server) userPaperless(ctx context.Context, uid int64) (*paperless.Client, error) {
 	st, err := s.store.Settings(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
-	admin, err := s.store.IsAdmin(ctx, uid)
-	if err != nil {
-		return nil, err
+	admin := false
+	if _, token := auth.Token(ctx); !token {
+		if admin, err = s.store.IsAdmin(ctx, uid); err != nil {
+			return nil, err
+		}
 	}
 	return s.paperlessFor(st, admin), nil
 }
