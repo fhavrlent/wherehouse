@@ -91,7 +91,7 @@ over the thing's purchase and warranty details.
 | `PUT /api/things/{id}/apps/{source}` | Link the thing: `{externalId, url, title, data, purchase}`. `source` is your app's name in lowercase, e.g. `warranteed`; `data` is up to 4 KB of JSON for yourself. With `purchase` (the purchase and warranty fields), your app owns them: Wherehouse shows them read-only and keeps them when the thing is edited here, while insurance and a sale stay Wherehouse's. Linking the same `externalId` to another thing moves the link. |
 | `DELETE /api/things/{id}/apps/{source}` | Unlink it. Purchase details you owned stay and become Wherehouse's. |
 | `GET /api/apps/{source}/{externalId}` | The thing linked to something of yours. |
-| `GET /api/changes?since=<RFC 3339>` | Things changed since then, and IDs of those deleted; ask again from `until`. Use it to notice things sold, archived or moved. |
+| `GET /api/changes?since=<RFC 3339>` | Things changed since then, and IDs of those deleted; ask again from `until`. About 1000 things come at once: with `more: true` there are more, so ask again from `until` straight away. Use it to notice things sold, archived or moved. |
 
 ## Maintenance
 

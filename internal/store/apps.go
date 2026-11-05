@@ -155,10 +155,19 @@ type Changes struct {
 	Until   string  `json:"until"`
 	Things  []Thing `json:"things"`
 	Deleted []int64 `json:"deleted"`
+	// More: not everything came, ask again from Until.
+	More bool `json:"more"`
 }
+
+// changesLimit is about how many things come at once.
+const changesLimit = 1000
 
 // ChangesSince lists the things of a household changed at or after since
 // (RFC 3339), and those deleted then.
+//
+// When more changed than the limit, it stops at the second the last thing
+// sent changed in, with all of that second, so asking again from Until
+// misses nothing and never asks for the same again.
 func (s *Store) ChangesSince(ctx context.Context, hh int64, since time.Time) (*Changes, error) {
 	until := time.Now().UTC().Truncate(time.Second)
 	from := since.UTC().Format(timeLayout)
@@ -167,16 +176,42 @@ func (s *Store) ChangesSince(ctx context.Context, hh int64, since time.Time) (*C
 		return nil, err
 	}
 	things, err := s.queryThings(ctx, t, `SELECT `+thingColumns+thingFrom+`
-		WHERE t.household_id = ? AND t.updated_at >= ? AND t.is_template = 0 ORDER BY t.updated_at, t.id LIMIT 1000`, hh, from)
+		WHERE t.household_id = ? AND t.updated_at >= ? AND t.is_template = 0 ORDER BY t.updated_at, t.id LIMIT ?`,
+		hh, from, changesLimit)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT thing_id FROM deleted_things WHERE household_id = ? AND deleted_at >= ?`, hh, from)
+	out := &Changes{Things: things, Deleted: []int64{}}
+	to := until.Format(timeLayout)
+	if len(things) == changesLimit {
+		last := things[len(things)-1]
+		rest, err := s.queryThings(ctx, t, `SELECT `+thingColumns+thingFrom+`
+			WHERE t.household_id = ? AND t.updated_at = ? AND t.id > ? AND t.is_template = 0 ORDER BY t.id`,
+			hh, last.UpdatedAt, last.ID)
+		if err != nil {
+			return nil, err
+		}
+		out.Things = append(out.Things, rest...)
+		at, err := time.Parse(timeLayout, last.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		// A second that is over can't change any more; the current one can,
+		// so it is asked for again.
+		to, out.More = last.UpdatedAt, true
+		if at.Before(until) {
+			until = at.Add(time.Second)
+		} else {
+			until = at
+		}
+	}
+	out.Until = until.Format(time.RFC3339)
+	rows, err := s.db.QueryContext(ctx, `SELECT thing_id FROM deleted_things
+		WHERE household_id = ? AND deleted_at >= ? AND deleted_at <= ?`, hh, from, to)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := &Changes{Until: until.Format(time.RFC3339), Things: things, Deleted: []int64{}}
 	for rows.Next() {
 		var id int64
 		if err := rows.Scan(&id); err != nil {
