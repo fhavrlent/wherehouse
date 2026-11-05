@@ -124,6 +124,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /api/attachments/{id}/file", s.attachmentFile)
 	api.HandleFunc("PATCH /api/attachments/{id}", s.updateAttachment)
 	api.HandleFunc("DELETE /api/attachments/{id}", s.deleteAttachment)
+	api.HandleFunc("GET /api/paperless", s.paperlessInfo)
 	api.HandleFunc("GET /api/paperless/search", s.searchPaperless)
 	api.HandleFunc("GET /api/paperless/documents/{doc}/things", s.documentThings)
 

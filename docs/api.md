@@ -78,6 +78,8 @@ purchase: `purchaseDate`, `purchasePrice` (of one piece), `purchaseFrom`,
 | `POST /api/photos/{id}/cover`, `DELETE /api/photos/{id}` | Make a photo the cover, or delete it. |
 | `POST /api/things/{id}/attachments` | Add a document (multipart: `file`, `kind` = `manual`, `receipt`, `warranty` or `other`). |
 | `GET /api/attachments/{id}/file` | A document; `?download=1` to download it. |
+| `GET /api/paperless` | The Paperless documents are linked from: `{url, publicUrl}`; 404 without one. Document IDs from another Paperless mean other documents. |
+| `POST /api/things/{id}/attachments/paperless` | Add Paperless documents: `{documentIds, kind}`. Needs a Paperless token in the person's settings. |
 | `POST /api/things/{id}/links` | Link the thing to a web address: `{url, title}`. Linking an address it already has changes the title. |
 | `DELETE /api/links/{id}` | Remove a link. |
 

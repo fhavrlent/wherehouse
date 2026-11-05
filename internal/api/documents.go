@@ -51,6 +51,16 @@ func (s *Server) userPaperless(ctx context.Context, uid int64) (*paperless.Clien
 	return s.paperlessFor(st, admin), nil
 }
 
+// paperlessInfo says which Paperless documents are linked from, so an app
+// can tell whether its document IDs mean the same documents here.
+func (s *Server) paperlessInfo(w http.ResponseWriter, r *http.Request) {
+	if s.cfg.Paperless.URL == "" {
+		writeMsg(w, http.StatusNotFound, "server.paperlessNotConfigured", nil)
+		return
+	}
+	writeJSON(w, 200, map[string]string{"url": s.cfg.Paperless.URL, "publicUrl": s.cfg.Paperless.PublicURL})
+}
+
 func (s *Server) uploadAttachment(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {

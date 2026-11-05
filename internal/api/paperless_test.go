@@ -81,6 +81,13 @@ func TestPaperlessLinkBack(t *testing.T) {
 		t.Errorf("opened at %q", loc)
 	}
 
+	// Apps can tell which Paperless the documents are in.
+	var info map[string]string
+	json.Unmarshal(mustCall(t, h, c, "GET", "/api/paperless", "", 200).Body.Bytes(), &info)
+	if info["url"] != pl.URL || info["publicUrl"] != pl.URL {
+		t.Errorf("paperless = %v", info)
+	}
+
 	var got map[string]any
 	json.Unmarshal(mustCall(t, h, c, "GET", "/api/settings", "", 200).Body.Bytes(), &got)
 	if got["paperlessBacklinks"] != true {
