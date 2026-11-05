@@ -67,7 +67,8 @@ func (im *Importer) Progress() Progress {
 	im.mu.Lock()
 	defer im.mu.Unlock()
 	p := im.progress
-	p.Errors = append([]string(nil), p.Errors...)
+	// Never nil: the page reads errors.length, and a nil slice is sent as null.
+	p.Errors = append([]string{}, p.Errors...)
 	return p
 }
 

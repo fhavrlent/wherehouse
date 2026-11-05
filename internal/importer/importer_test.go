@@ -132,6 +132,10 @@ func TestImport(t *testing.T) {
 	}
 
 	im := New(st, homebox.New(hb.URL, "key"), dirFiles{dir}, hh, u.ID)
+	// Before anything goes wrong the problems list is empty, not null, so the page can read it.
+	if b, _ := json.Marshal(im.Progress()); !strings.Contains(string(b), `"errors":[]`) {
+		t.Fatalf("fresh progress = %s", b)
+	}
 	if err := im.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
