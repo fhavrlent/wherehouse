@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { QrCode } from "@/components/QrCode";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/input";
-import { Card } from "@/components/ui/misc";
+import { Card, CardHeader } from "@/components/ui/misc";
 import { api, errorMessage } from "@/lib/api";
 import {
   labelUrl,
@@ -63,7 +63,7 @@ export const Labels = () => {
         </Button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_auto]">
+      <div className={pages.length > 0 ? "grid gap-6 lg:grid-cols-[1fr_auto]" : "flex flex-col"}>
         <div className="flex flex-col gap-4">
           <Card className="grid gap-4 p-5 sm:grid-cols-[1fr_9rem]">
             <Field label={t("labels.sheet")}>
@@ -97,14 +97,13 @@ export const Labels = () => {
           </Card>
 
           <Card className="overflow-hidden">
-            <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-              <h2 className="text-sm font-semibold">{t("labels.list", { count: list.length })}</h2>
+            <CardHeader title={t("labels.list", { count: list.length })}>
               {list.length > 0 && (
                 <Button variant="ghost" size="sm" onClick={printList.clear}>
                   <Trash2 /> {t("labels.clear")}
                 </Button>
               )}
-            </div>
+            </CardHeader>
             {list.length === 0 ? (
               <p className="px-4 py-6 text-sm text-fg-muted">{t("labels.empty")}</p>
             ) : (

@@ -144,7 +144,9 @@ const Reminders = ({ s }: { s: SettingsT }) => {
   const { t } = useTranslation();
   const update = useAutoSave(s);
   const [urls, setUrls] = useState(s.notifyUrls);
-  const [days, setDays] = useState(s.notifyDays);
+  // Kept as "7,0"; shown as a list.
+  const savedDays = s.notifyDays.split(",").join(", ");
+  const [days, setDays] = useState(savedDays);
   const [testing, setTesting] = useState(false);
   const test = async () => {
     setTesting(true);
@@ -175,23 +177,30 @@ const Reminders = ({ s }: { s: SettingsT }) => {
           className="font-mono text-[13px]"
         />
       </Field>
-      <div className="flex flex-wrap items-end gap-3">
-        <Field label={t("settings.reminders.days")} hint={t("settings.reminders.daysHint")}>
-          <Input
-            value={days}
-            onChange={(e) => setDays(e.target.value)}
-            onBlur={() =>
-              days !== s.notifyDays &&
-              void update({ notifyDays: days }).then((ok) => {
-                if (!ok) setDays(s.notifyDays);
-              })
-            }
-            className="w-40 tabular-nums"
-          />
-        </Field>
-        <Button variant="outline" onClick={test} loading={testing} disabled={!urls.trim()}>
-          {t("settings.reminders.test")}
-        </Button>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex flex-wrap items-end gap-3">
+          <Field label={t("settings.reminders.days")} htmlFor="notify-days">
+            <Input
+              id="notify-days"
+              value={days}
+              onChange={(e) => setDays(e.target.value)}
+              onBlur={() =>
+                days !== savedDays &&
+                void update({ notifyDays: days }).then((ok) => {
+                  if (!ok) setDays(savedDays);
+                })
+              }
+              aria-describedby="notify-days-hint"
+              className="w-40 tabular-nums"
+            />
+          </Field>
+          <Button variant="outline" onClick={test} loading={testing} disabled={!urls.trim()}>
+            {t("settings.reminders.test")}
+          </Button>
+        </div>
+        <p id="notify-days-hint" className="text-xs text-fg-subtle">
+          {t("settings.reminders.daysHint")}
+        </p>
       </div>
     </Section>
   );

@@ -60,7 +60,7 @@ func fakeHomeBox(t *testing.T) *httptest.Server {
 		"kayak": map[string]any{"id": "kayak", "name": "Kayak", "fields": []any{
 			map[string]any{"type": "text", "name": "Warranteed", "textValue": "12-abc"},
 			map[string]any{"type": "text", "name": "Colour", "textValue": "Red"}}},
-		"paddle": map[string]any{"id": "paddle", "name": "Paddle"},
+		"paddle": map[string]any{"id": "paddle", "name": "Paddle", "entityType": map[string]any{"name": "Věc"}},
 		"drill": map[string]any{
 			"id": "drill", "name": "Drill", "assetId": 42, "manufacturer": "Makita", "modelNumber": "DDF484",
 			"serialNumber": "SN1", "quantity": 1, "purchaseDate": "2024-03-01T00:00:00Z", "purchasePrice": "129.9",
@@ -241,7 +241,9 @@ func TestImport(t *testing.T) {
 	if err != nil || kayak.ParentID != nil || len(kayak.Fields) != 1 || kayak.Fields[0].Value != "Red" {
 		t.Errorf("kayak = %+v, %v", kayak, err)
 	}
-	if paddle, err := st.FromHomeBox(ctx, hh, "paddle"); err != nil || paddle.ParentID == nil || *paddle.ParentID != kayak.ID {
+	// A type named like a kind here, in any language, is that kind.
+	if paddle, err := st.FromHomeBox(ctx, hh, "paddle"); err != nil || paddle.ParentID == nil || *paddle.ParentID != kayak.ID ||
+		paddle.Kind.Key != "thing" {
 		t.Errorf("paddle = %+v, %v", paddle, err)
 	}
 	garage, _ := st.FromHomeBox(ctx, hh, "garage")

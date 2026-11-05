@@ -7,7 +7,7 @@ import { KindIcon } from "@/components/KindIcon";
 import { PlaceField } from "@/components/PlacePicker";
 import { Breadcrumbs, Section, ThingList } from "@/components/Things";
 import { linkButton } from "@/components/ui/buttonStyles";
-import { Card } from "@/components/ui/misc";
+import { Card, CardHeader } from "@/components/ui/misc";
 import { api, type Group, type Money } from "@/lib/api";
 import { kindName } from "@/lib/kinds";
 import { formatMoney } from "@/lib/utils";
@@ -30,7 +30,7 @@ const Amount = ({ money, currency, className }: { money: Money; currency: string
 const Tile = ({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) => (
   <Card className="p-4">
     <p className="text-xs text-fg-muted">{label}</p>
-    <p className="mt-1 text-xl font-semibold tracking-tight">{children}</p>
+    <p className="mt-1 text-lg font-semibold tracking-tight break-words tabular-nums sm:text-xl">{children}</p>
     {hint && <p className="mt-1 text-xs text-fg-subtle">{hint}</p>}
   </Card>
 );
@@ -53,7 +53,7 @@ const Bars = ({
   const { t } = useTranslation();
   const max = Math.max(...groups.map((g) => g.value[currency] ?? 0), 1);
   return (
-    <ul className="flex flex-col gap-2.5">
+    <ul className="flex flex-col gap-2.5 p-4">
       {groups.map((g) => {
         const v = g.value[currency] ?? 0;
         const name = link ? (
@@ -67,7 +67,7 @@ const Bars = ({
           <li
             key={g.id}
             title={`${formatMoney(v, currency)} · ${t("report.count", { count: g.count })}`}
-            className="grid grid-cols-[minmax(6rem,10rem)_1fr_auto] items-center gap-3 text-sm"
+            className="grid grid-cols-[minmax(0,6.5rem)_1fr_auto] items-center gap-3 text-sm sm:grid-cols-[minmax(6rem,10rem)_1fr_auto]"
           >
             <span className="flex min-w-0 items-center gap-1.5 truncate">{name}</span>
             <span className="h-3 rounded-r bg-surface-3">
@@ -118,7 +118,7 @@ export const Report = () => {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile label={t("report.value")} hint={t("report.valueHint")}>
           <Amount money={r.value} currency={cur} />
         </Tile>
@@ -136,10 +136,10 @@ export const Report = () => {
         </Tile>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 lg:[&>:last-child:nth-child(odd)]:col-span-2">
         {r.byPlace.length > 0 && (
-          <Card className="p-5">
-            <h2 className="mb-4 text-sm font-semibold">{t("report.byPlace")}</h2>
+          <Card className="overflow-hidden">
+            <CardHeader title={t("report.byPlace")} />
             <Bars
               groups={r.byPlace}
               currency={cur}
@@ -154,8 +154,8 @@ export const Report = () => {
           </Card>
         )}
         {r.byKind.length > 0 && (
-          <Card className="p-5">
-            <h2 className="mb-4 text-sm font-semibold">{t("report.byKind")}</h2>
+          <Card className="overflow-hidden">
+            <CardHeader title={t("report.byKind")} />
             <Bars
               groups={r.byKind}
               currency={cur}
@@ -169,8 +169,8 @@ export const Report = () => {
           </Card>
         )}
         {r.byTag.length > 0 && (
-          <Card className="p-5">
-            <h2 className="mb-4 text-sm font-semibold">{t("report.byTag")}</h2>
+          <Card className="overflow-hidden">
+            <CardHeader title={t("report.byTag")} />
             <Bars
               groups={r.byTag}
               currency={cur}

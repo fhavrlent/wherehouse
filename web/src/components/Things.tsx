@@ -34,24 +34,24 @@ export const PlaceCard = ({ thing }: { thing: Thing }) => {
       {...dragProps([thing.id])}
       {...drop.props}
       className={cn(
-        "group flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 shadow-card transition-colors hover:border-border-strong",
+        "group flex min-w-0 items-center gap-2.5 rounded-2xl border border-border bg-surface p-2.5 shadow-card transition-colors hover:border-border-strong sm:gap-3 sm:p-3",
         drop.over && "border-primary bg-primary-soft/50 ring-2 ring-primary/30",
       )}
     >
-      <Cover photo={thing.cover} icon={thing.kind.icon} className="size-12" />
+      <Cover photo={thing.cover} icon={thing.kind.icon} className="size-10 sm:size-12" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{thing.name}</span>
         <span className="block truncate text-xs text-fg-subtle">
           {thing.contains === 0 ? t("place.empty") : t("place.contains", { count: thing.contains })}
         </span>
       </span>
-      <ChevronRight className="size-4 text-fg-subtle opacity-0 transition-opacity group-hover:opacity-100" />
+      <ChevronRight className="hidden size-4 shrink-0 text-fg-subtle opacity-0 transition-opacity group-hover:opacity-100 sm:block" />
     </Link>
   );
 };
 
 export const PlaceGrid = ({ things }: { things: Thing[] }) => (
-  <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+  <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
     {things.map((p) => (
       <PlaceCard key={p.id} thing={p} />
     ))}

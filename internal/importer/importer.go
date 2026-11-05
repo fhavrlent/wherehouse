@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/fhavrlent/wherehouse/internal/homebox"
+	"github.com/fhavrlent/wherehouse/internal/i18n"
 	"github.com/fhavrlent/wherehouse/internal/store"
 )
 
@@ -229,6 +230,9 @@ func (im *Importer) walk(ctx context.Context, nodes []homebox.Node, parent *int6
 func (im *Importer) kind(ctx context.Context, n homebox.Node, e *homebox.Entity, parent *int64) (int64, error) {
 	location := n.Type == "location"
 	if t := e.EntityType; t != nil && t.Name != "" && !strings.EqualFold(t.Name, "location") && !strings.EqualFold(t.Name, "item") {
+		if id, ok := im.builtIn(t.Name); ok {
+			return id, nil
+		}
 		key := strings.ToLower(t.Name)
 		if id, ok := im.kinds[key]; ok {
 			return id, nil
@@ -251,6 +255,23 @@ func (im *Importer) kind(ctx context.Context, n homebox.Node, e *homebox.Entity,
 		return im.kinds["key:room"], nil
 	}
 	return im.kinds["key:thing"], nil
+}
+
+// builtIn finds the built-in kind a type is named for in any language
+// here, such as "Room" or "Místnost".
+func (im *Importer) builtIn(typeName string) (int64, bool) {
+	for k, id := range im.kinds {
+		key, ok := strings.CutPrefix(k, "key:")
+		if !ok {
+			continue
+		}
+		for _, lang := range i18n.Languages() {
+			if strings.EqualFold(strings.TrimSpace(typeName), i18n.T(lang, "kinds."+key, nil)) {
+				return id, true
+			}
+		}
+	}
+	return 0, false
 }
 
 func (im *Importer) thing(ctx context.Context, n homebox.Node, parent *int64) (int64, error) {
