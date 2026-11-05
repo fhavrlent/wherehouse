@@ -120,12 +120,12 @@ const ThingView = ({ thing }: { thing: ThingDetail }) => {
     ],
     [t("thingForm.purchaseFrom"), thing.purchaseFrom],
     [t("thingForm.warrantyUntil"), thing.lifetimeWarranty ? t("thing.lifetime") : (thing.warrantyUntil ?? "")],
-    [t("thingForm.warrantyDetails"), thing.warrantyDetails],
+    [t("thingForm.warrantyDetails"), lines(thing.warrantyDetails)],
     [t("thingForm.insured"), thing.insured && t("item.yes")],
     [t("thingForm.soldDate"), thing.soldDate ?? ""],
     [t("thingForm.soldPrice"), thing.soldPrice !== null && money(thing.soldPrice)],
     [t("thingForm.soldTo"), thing.soldTo],
-    [t("thingForm.soldNotes"), thing.soldNotes],
+    [t("thingForm.soldNotes"), lines(thing.soldNotes)],
   ];
   const shown = (rows: [string, ReactNode][]) => rows.filter(([, v]) => v !== "" && v !== null && v !== false);
 
@@ -359,3 +359,6 @@ const FieldValueView = ({ type, value }: { type: FieldType; value: string }) => 
 
 /** Old place links lead to the same page. */
 export const PlaceRedirect = () => <Navigate to={`/i/${useParams().id ?? ""}`} replace />;
+
+/** Text that may have several lines, kept as they are; "" when there's none. */
+const lines = (text: string) => text && <span className="whitespace-pre-line">{text}</span>;
