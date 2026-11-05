@@ -14,7 +14,7 @@ Wherehouse is a sibling of [Warranteed](https://github.com/fhavrlent/warranteed)
 - Purchase date, price, seller, warranty, insurance and sale for every thing; the Value page totals what things cost, by place, kind and tag, and prints an insurance list.
 - Tags, custom fields, documents (stored here or linked from Paperless-ngx), and a maintenance log with reminders through ntfy, Gotify, Discord, Telegram, email and other services.
 - Copy a thing, or save it as a template to add similar ones.
-- Export as a spreadsheet, or everything with photos and documents as a ZIP.
+- Export as a spreadsheet, or everything with photos and documents as a ZIP, and restore that ZIP as a new household.
 - Several households, such as home and a cottage, each with its own people, invited with a link.
 - API tokens for other apps, such as Warranteed.
 - Sign-in through an OpenID Connect provider (Pocket ID, Authentik, Keycloak, …). There are no local passwords.
@@ -105,6 +105,8 @@ Apps such as Warranteed use Wherehouse with an API token from **Settings → API
 ## Storage and backups
 
 The database (`wherehouse.db`, SQLite) is in `WHEREHOUSE_DATA_DIR`. Keep it on local disk; SQLite does not work reliably on NFS or SMB. Photos and documents are in `WHEREHOUSE_FILES_DIR`, which can be on network storage. Previews (`*.thumb.jpg`) can be left out of backups. To copy the database while the app runs, use `sqlite3 wherehouse.db ".backup backup.db"`.
+
+The ZIP from **Settings → Export** holds one household with its files. **Restore from a backup…** next to it brings it back as a new household, on this or another Wherehouse, and leaves what is there alone. Labels already on things of another household on the same Wherehouse stay there, so the restored things come back without them.
 
 The container runs as uid 65532; bind mounts must be writable by that user.
 

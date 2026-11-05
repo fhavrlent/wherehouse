@@ -82,6 +82,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /api/report/insured", s.insured)
 	api.HandleFunc("GET /api/export.csv", s.exportCSV)
 	api.HandleFunc("GET /api/export.zip", s.exportZip)
+	api.HandleFunc("POST /api/restore", sessionOnly(s.restoreZip))
 	api.HandleFunc("GET /api/search", s.search)
 	api.HandleFunc("POST /api/move", s.move)
 

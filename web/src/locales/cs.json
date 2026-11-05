@@ -153,7 +153,18 @@
       "description": "Vezměte si data s sebou, nebo si nechte kopii.",
       "csv": "Tabulka (CSV)",
       "zip": "Všechno (ZIP)",
-      "hint": "ZIP obsahuje všechny údaje všech věcí i s fotkami a dokumenty; dokumenty v Paperless zůstávají tam."
+      "hint": "ZIP obsahuje všechny údaje všech věcí i s fotkami a dokumenty; dokumenty v Paperless zůstávají tam.",
+      "restore": "Obnovit ze zálohy…",
+      "restoring": "Obnovuji…",
+      "restoreHint": "Vyberte export Vše (ZIP). Vrátí se jako nová domácnost se všemi věcmi, fotkami, dokumenty, štítky a údržbou; nic z toho, co je tu teď, se nezmění.",
+      "restored_one": "Obnoveno „{{name}}“: {{count}} věc",
+      "restored_few": "Obnoveno „{{name}}“: {{count}} věci",
+      "restored_many": "Obnoveno „{{name}}“: {{count}} věci",
+      "restored_other": "Obnoveno „{{name}}“: {{count}} věcí",
+      "labelsSkipped_one": "{{count}} štítek je pořád na věci v jiné domácnosti, takže se jeho věc vrátila bez něj.",
+      "labelsSkipped_few": "{{count}} štítky jsou pořád na věcech v jiné domácnosti, takže se jejich věci vrátily bez nich.",
+      "labelsSkipped_many": "{{count}} štítku je pořád na věcech v jiné domácnosti, takže se jejich věci vrátily bez nich.",
+      "labelsSkipped_other": "{{count}} štítků je pořád na věcech v jiné domácnosti, takže se jejich věci vrátily bez nich."
     }
   },
   "errors": {
@@ -253,7 +264,10 @@
     "hookTokenOnly": "Kam posílat oznámení, může nastavit jen token aplikace",
     "hookNotConnected": "Oznámení jdou jen aplikacím připojeným přes Připojit",
     "hookHost": "Oznámení můžou jít jen na {{host}}, adresu schválenou při připojení",
-    "sessionOnly": "S API tokenem to nejde, přihlaste se"
+    "sessionOnly": "S API tokenem to nejde, přihlaste se",
+    "backupTooLarge": "Záloha je příliš velká",
+    "backupInvalid": "Tohle není záloha z Wherehouse (export.zip)",
+    "backupFileTooLarge": "Soubor v záloze je větší než {{mb}} MB"
   },
   "signIn": {
     "unreachable": "Poskytovatel identity není dostupný. Zkuste to za chvíli znovu.",

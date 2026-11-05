@@ -361,6 +361,9 @@ const request = async <T>(method: string, url: string, body?: unknown): Promise<
   const init: RequestInit = { method, headers: {}, credentials: "same-origin" };
   if (body instanceof FormData) {
     init.body = body;
+  } else if (body instanceof Blob) {
+    init.body = body;
+    (init.headers as Record<string, string>)["Content-Type"] = body.type || "application/octet-stream";
   } else if (body !== undefined) {
     init.body = JSON.stringify(body);
     (init.headers as Record<string, string>)["Content-Type"] = "application/json";
@@ -390,6 +393,17 @@ const request = async <T>(method: string, url: string, body?: unknown): Promise<
   return res.json() as Promise<T>;
 };
 
+/** What restoring a backup brought back. */
+export interface RestoreResult {
+  householdId: number;
+  name: string;
+  things: number;
+  photos: number;
+  documents: number;
+  /** Labels left on things of another household here, e.g. the one the backup was made of. */
+  labelsSkipped: number;
+}
+
 export const api = {
   authInfo: () => request<AuthInfo>("GET", "/api/auth/info"),
   me: () => request<User>("GET", "/api/me"),
@@ -406,6 +420,8 @@ export const api = {
   createHousehold: (name: string, currency: string) =>
     request<undefined>("POST", "/api/households", { name, currency }),
   switchHousehold: (id: number) => request<undefined>("POST", `/api/households/${id}/switch`),
+  /** Makes a new household from a backup made with export.zip, and switches to it. */
+  restore: (backup: File) => request<RestoreResult>("POST", "/api/restore", backup),
   household: () => request<Household & { members: Member[] }>("GET", "/api/household"),
   updateHousehold: (name: string, currency: string) => request<undefined>("PUT", "/api/household", { name, currency }),
   invite: () => request<{ url: string; expires: string }>("POST", "/api/household/invites"),

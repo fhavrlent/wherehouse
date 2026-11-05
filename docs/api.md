@@ -119,3 +119,4 @@ A label's QR code holds `<Wherehouse address>/l/<code>`.
 | `GET /api/report` | Totals: `value` and `insured` by currency, counts, and value by place, kind and tag; `in=<id>` for what is inside one thing. |
 | `GET /api/report/insured` | Insured things that weren't sold. |
 | `GET /api/export.csv`, `GET /api/export.zip` | The household as a spreadsheet, or everything with its files. |
+| `POST /api/restore` | Body: a ZIP from `export.zip`. Makes a new household of it and switches to it; returns what came back. Signed-in session only. |

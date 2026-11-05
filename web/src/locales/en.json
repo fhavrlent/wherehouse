@@ -149,7 +149,14 @@
       "description": "Take your data with you, or keep a copy.",
       "csv": "Spreadsheet (CSV)",
       "zip": "Everything (ZIP)",
-      "hint": "The ZIP has every detail of every thing with its photos and documents; documents in Paperless stay there."
+      "hint": "The ZIP has every detail of every thing with its photos and documents; documents in Paperless stay there.",
+      "restore": "Restore from a backup…",
+      "restoring": "Restoring…",
+      "restoreHint": "Pick an Everything (ZIP) export. It comes back as a new household with every thing, photo, document, label and maintenance entry in it; nothing that's here now changes.",
+      "restored_one": "Restored “{{name}}”: {{count}} thing",
+      "restored_other": "Restored “{{name}}”: {{count}} things",
+      "labelsSkipped_one": "{{count}} label is still on a thing in another household, so its thing came back without it.",
+      "labelsSkipped_other": "{{count}} labels are still on things in another household, so their things came back without them."
     }
   },
   "errors": {
@@ -247,7 +254,10 @@
     "hookTokenOnly": "Only an app’s token can set where to ping it",
     "hookNotConnected": "Only apps connected through Connect can be pinged",
     "hookHost": "Pings can only go to {{host}}, the address approved when connecting",
-    "sessionOnly": "An API token can’t do that; sign in instead"
+    "sessionOnly": "An API token can’t do that; sign in instead",
+    "backupTooLarge": "The backup is too large",
+    "backupInvalid": "That isn't a Wherehouse backup (export.zip)",
+    "backupFileTooLarge": "A file in the backup is larger than {{mb}} MB"
   },
   "signIn": {
     "unreachable": "Could not reach the identity provider. Try again in a moment.",

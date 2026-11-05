@@ -39,12 +39,16 @@ Extract a shared module only when keeping two copies in sync starts to hurt.
 - Several households with invites; copying and templates; CSV and ZIP export.
 - API tokens, connecting other apps, app links, a change feed and pings. Warranteed uses all of these.
 
+## Scope
+
+The integration with Warranteed is complete. From here on it gets fixes only, no new sync features: keeping two apps in step both ways is where most bugs come from.
+
 ## Still open
 
 - Screenshots in the README, and a first release.
 - Paperless linking is tested against a fake only.
 
-Later, maybe: AI suggestions from a photo (name, manufacturer, model) with Claude, as Warranteed does for receipts; restoring from the ZIP; lending.
+Later, maybe: AI suggestions from a photo (name, manufacturer, model) with Claude, as Warranteed does for receipts; lending.
 
 ## Open questions
 

@@ -36,8 +36,9 @@ import {
   useSettingsQuery,
   useTemplates,
 } from "@/lib/queries";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { linkButton } from "@/components/ui/buttonStyles";
+import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { applyTheme } from "@/lib/theme";
 
@@ -811,6 +812,25 @@ const Templates = () => {
 
 const ExportSection = () => {
   const { t } = useTranslation();
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const [restoring, setRestoring] = useState(false);
+  // A backup comes back as a household of its own, so nothing here changes.
+  const restore = async (file: File) => {
+    setRestoring(true);
+    try {
+      const res = await api.restore(file);
+      await qc.invalidateQueries();
+      toast.success(t("settings.export.restored", { name: res.name, count: res.things }), {
+        description: res.labelsSkipped ? t("settings.export.labelsSkipped", { count: res.labelsSkipped }) : undefined,
+      });
+      void navigate("/");
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setRestoring(false);
+    }
+  };
   return (
     <Section icon={<FileDown />} title={t("settings.export.title")} description={t("settings.export.description")}>
       <div className="flex flex-wrap gap-2">
@@ -822,6 +842,25 @@ const ExportSection = () => {
         </a>
       </div>
       <p className="text-xs text-fg-subtle">{t("settings.export.hint")}</p>
+      <div className="flex flex-col gap-1.5">
+        <label
+          className={cn(linkButton("outline"), "w-fit cursor-pointer", restoring && "pointer-events-none opacity-60")}
+        >
+          {restoring ? t("settings.export.restoring") : t("settings.export.restore")}
+          <input
+            type="file"
+            accept=".zip,application/zip"
+            className="sr-only"
+            disabled={restoring}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) void restore(file);
+            }}
+          />
+        </label>
+        <p className="text-xs text-fg-subtle">{t("settings.export.restoreHint")}</p>
+      </div>
     </Section>
   );
 };
