@@ -32,3 +32,12 @@ func (s *Store) RestoreMaintenanceTimes(ctx context.Context, id int64, created, 
 		updated_at = COALESCE(NULLIF(?, ''), updated_at) WHERE id = ?`, created, updated, id)
 	return err
 }
+
+// KeepTimes gives a thing brought over from elsewhere the times it had
+// there. Empty ones are left as they are.
+func (s *Store) KeepTimes(ctx context.Context, hh, thing int64, created, updated string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE things SET created_at = COALESCE(NULLIF(?, ''), created_at),
+		updated_at = COALESCE(NULLIF(?, ''), updated_at) WHERE id = ? AND household_id = ?`,
+		created, updated, thing, hh)
+	return err
+}

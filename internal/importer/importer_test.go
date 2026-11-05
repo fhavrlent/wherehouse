@@ -44,6 +44,8 @@ func (d dirFiles) Remove(names ...string) {
 //	    Toolbox (an item holding another)
 //	      Hammer
 //	    Drill (sold)
+//	Kayak (in no location, so not in the tree)
+//	  Paddle
 func fakeHomeBox(t *testing.T) *httptest.Server {
 	t.Helper()
 	var photo bytes.Buffer
@@ -53,7 +55,12 @@ func fakeHomeBox(t *testing.T) *httptest.Server {
 		"garage": map[string]any{"id": "garage", "name": "Garage", "assetId": "000-007"},
 		"toolbox": map[string]any{"id": "toolbox", "name": "Toolbox", "purchasePrice": 40, "serialNumber": "TB-1",
 			"entityType": map[string]any{"name": "Tool box", "isLocation": false}},
-		"hammer": map[string]any{"id": "hammer", "name": "Hammer", "quantity": 2, "tags": []any{map[string]any{"name": "Tools"}}},
+		"hammer": map[string]any{"id": "hammer", "name": "Hammer", "quantity": 2, "tags": []any{map[string]any{"name": "Tools"}},
+			"createdAt": "2024-05-06T07:08:09.123456789+02:00", "updatedAt": "2025-01-02T03:04:05Z"},
+		"kayak": map[string]any{"id": "kayak", "name": "Kayak", "fields": []any{
+			map[string]any{"type": "text", "name": "Warranteed", "textValue": "12-abc"},
+			map[string]any{"type": "text", "name": "Colour", "textValue": "Red"}}},
+		"paddle": map[string]any{"id": "paddle", "name": "Paddle"},
 		"drill": map[string]any{
 			"id": "drill", "name": "Drill", "assetId": 42, "manufacturer": "Makita", "modelNumber": "DDF484",
 			"serialNumber": "SN1", "quantity": 1, "purchaseDate": "2024-03-01T00:00:00Z", "purchasePrice": "129.9",
@@ -94,6 +101,19 @@ func fakeHomeBox(t *testing.T) *httptest.Server {
 			send(map[string]any{"item": map[string]any{"name": "Filip"}})
 		case p == "/entities/tree":
 			send(tree)
+		case p == "/entities":
+			// Items, or locations, one page; the paddle before what it's in.
+			var items []any
+			if r.URL.Query().Get("page") == "1" && r.URL.Query().Get("includeArchived") == "true" {
+				if r.URL.Query().Get("isLocation") == "true" {
+					items = []any{map[string]any{"id": "house"}, map[string]any{"id": "garage"}}
+				} else {
+					items = []any{map[string]any{"id": "paddle", "name": "Paddle", "parent": map[string]any{"id": "kayak"}},
+						map[string]any{"id": "toolbox"}, map[string]any{"id": "hammer"}, map[string]any{"id": "drill"},
+						map[string]any{"id": "kayak", "name": "Kayak"}}
+				}
+			}
+			send(map[string]any{"items": items, "page": 1, "pageSize": 100, "total": len(items)})
 		case p == "/entities/drill/maintenance":
 			send([]any{
 				map[string]any{"name": "New battery", "scheduledDate": "2027-01-01", "completedDate": "0001-01-01T00:00:00Z"},
@@ -155,7 +175,7 @@ func TestImport(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := im.Progress()
-	if p.Things != 5 || p.Photos != 1 || p.Documents != 3 || p.Links != 2 || p.Maintenance != 2 || len(p.Errors) != 0 {
+	if p.Things != 7 || p.Total != 7 || p.Photos != 1 || p.Documents != 3 || p.Links != 2 || p.Maintenance != 2 || len(p.Errors) != 0 {
 		t.Fatalf("progress = %+v", p)
 	}
 
@@ -211,6 +231,19 @@ func TestImport(t *testing.T) {
 	if hammer.Quantity != 2 || len(hammer.Path) != 3 || hammer.Path[2].Name != "Toolbox" {
 		t.Errorf("hammer = %+v", hammer)
 	}
+	// It keeps the times it has in HomeBox.
+	if hammer.CreatedAt != "2024-05-06T05:08:09Z" || hammer.UpdatedAt != "2025-01-02T03:04:05Z" {
+		t.Errorf("hammer times = %s, %s", hammer.CreatedAt, hammer.UpdatedAt)
+	}
+	// What is in no location comes too, with what is in it; Warranteed's
+	// own field stays behind.
+	kayak, err := st.FromHomeBox(ctx, hh, "kayak")
+	if err != nil || kayak.ParentID != nil || len(kayak.Fields) != 1 || kayak.Fields[0].Value != "Red" {
+		t.Errorf("kayak = %+v, %v", kayak, err)
+	}
+	if paddle, err := st.FromHomeBox(ctx, hh, "paddle"); err != nil || paddle.ParentID == nil || *paddle.ParentID != kayak.ID {
+		t.Errorf("paddle = %+v, %v", paddle, err)
+	}
 	garage, _ := st.FromHomeBox(ctx, hh, "garage")
 	if garage.Label != "000-007" {
 		t.Errorf("garage label = %q", garage.Label)
@@ -233,7 +266,7 @@ func TestImport(t *testing.T) {
 	if err := again.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if p := again.Progress(); p.Things != 0 || p.Skipped != 5 || p.Links != 1 || p.Documents != 0 || len(p.Errors) != 0 {
+	if p := again.Progress(); p.Things != 0 || p.Skipped != 7 || p.Links != 1 || p.Documents != 0 || len(p.Errors) != 0 {
 		t.Errorf("second import = %+v", p)
 	}
 	drill, _ = st.FromHomeBox(ctx, hh, "drill")

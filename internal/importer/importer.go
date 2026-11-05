@@ -134,8 +134,75 @@ func (im *Importer) run(ctx context.Context) error {
 		}
 	}
 	count(tree)
-	im.update(func(p *Progress) { p.Total = total })
-	return im.walk(ctx, tree, nil)
+	all, err := im.hb.All(ctx)
+	if err != nil {
+		return err
+	}
+	inTree := map[string]bool{}
+	var mark func([]homebox.Node)
+	mark = func(ns []homebox.Node) {
+		for _, n := range ns {
+			inTree[n.ID] = true
+			mark(n.Children)
+		}
+	}
+	mark(tree)
+	var rest []homebox.Summary
+	for _, s := range all {
+		if !inTree[s.ID] {
+			rest = append(rest, s)
+		}
+	}
+	im.update(func(p *Progress) { p.Total = total + len(rest) })
+	if err := im.walk(ctx, tree, nil); err != nil {
+		return err
+	}
+	return im.rest(ctx, rest)
+}
+
+// rest imports what isn't in HomeBox's tree, such as items in no location
+// and what is in them, each after what it is in.
+func (im *Importer) rest(ctx context.Context, rest []homebox.Summary) error {
+	waiting := map[string]bool{}
+	for _, s := range rest {
+		waiting[s.ID] = true
+	}
+	for len(rest) > 0 {
+		var later []homebox.Summary
+		for _, s := range rest {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if s.Parent != nil && waiting[s.Parent.ID] {
+				later = append(later, s)
+				continue
+			}
+			var parent *int64
+			if s.Parent != nil {
+				if id, err := im.st.Imported(ctx, im.hh, s.Parent.ID); err == nil && id != 0 {
+					parent = &id
+				}
+			}
+			n := homebox.Node{ID: s.ID, Name: s.Name, Type: "item"}
+			if s.EntityType != nil && s.EntityType.IsLocation {
+				n.Type = "location"
+			}
+			_, err := im.thing(ctx, n, parent)
+			delete(waiting, s.ID)
+			im.update(func(p *Progress) { p.Done++ })
+			if err != nil {
+				im.problem(s.Name, err)
+			}
+		}
+		// What is in each other never comes first; it goes in nothing.
+		if len(later) == len(rest) {
+			for i := range later {
+				later[i].Parent = nil
+			}
+		}
+		rest = later
+	}
+	return nil
 }
 
 func (im *Importer) walk(ctx context.Context, nodes []homebox.Node, parent *int64) error {
@@ -241,7 +308,20 @@ func (im *Importer) thing(ctx context.Context, n homebox.Node, parent *int64) (i
 	}
 	im.copyFiles(ctx, e, t.ID)
 	im.maintenance(ctx, e, t.ID)
+	// Last, as adding photos and the rest counts as changing it.
+	if err := im.st.KeepTimes(ctx, im.hh, t.ID, timestamp(e.CreatedAt), timestamp(e.UpdatedAt)); err != nil {
+		im.problem(e.Name, err)
+	}
 	return t.ID, nil
+}
+
+// timestamp is a HomeBox time as times are kept here, or "" if it has none.
+func timestamp(s string) string {
+	t, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil || t.Year() < 1900 {
+		return ""
+	}
+	return t.UTC().Format("2006-01-02T15:04:05Z")
 }
 
 // fields turns HomeBox's custom fields into custom fields here, adding the
@@ -259,7 +339,9 @@ func (im *Importer) fields(ctx context.Context, e *homebox.Entity) (map[int64]st
 				value = "true"
 			}
 		}
-		if value == "" {
+		// Warranteed keeps a field of its own on HomeBox items, to list
+		// those of one receipt; here its links do that.
+		if value == "" || strings.EqualFold(f.Name, "Warranteed") {
 			continue
 		}
 		field, err := im.st.FieldByName(ctx, im.hh, name(f.Name), typ)

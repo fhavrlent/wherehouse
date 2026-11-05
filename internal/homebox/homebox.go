@@ -103,9 +103,54 @@ func (c *Client) Tree(ctx context.Context) ([]Node, error) {
 	return out, err
 }
 
+// Summary is a location or item as HomeBox lists it.
+type Summary struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Parent *struct {
+		ID string `json:"id"`
+	} `json:"parent"`
+	EntityType *EntityType `json:"entityType"`
+}
+
+// All lists every item, archived ones too, and every location. The tree
+// leaves out items in no location and what is in them.
+func (c *Client) All(ctx context.Context) ([]Summary, error) {
+	const pageSize = 100
+	var out []Summary
+	seen := map[string]bool{}
+	for _, location := range []string{"false", "true"} {
+		for page := 1; ; page++ {
+			var res struct {
+				Items []Summary `json:"items"`
+			}
+			q := url.Values{"isLocation": {location}, "includeArchived": {"true"},
+				"page": {strconv.Itoa(page)}, "pageSize": {strconv.Itoa(pageSize)}}
+			if err := c.get(ctx, "/entities", q, &res); err != nil {
+				return nil, err
+			}
+			added := 0
+			for _, s := range res.Items {
+				if !seen[s.ID] {
+					seen[s.ID] = true
+					out = append(out, s)
+					added++
+				}
+			}
+			// A page with nothing new also ends it, should paging be ignored.
+			if len(res.Items) < pageSize || added == 0 {
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
 // Entity is a HomeBox location or item, as much as is imported of it.
 type Entity struct {
 	ID               string       `json:"id"`
+	CreatedAt        string       `json:"createdAt"`
+	UpdatedAt        string       `json:"updatedAt"`
 	AssetID          flexString   `json:"assetId"`
 	Name             string       `json:"name"`
 	Description      string       `json:"description"`
