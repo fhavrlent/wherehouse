@@ -50,6 +50,23 @@ func TestTokensAndLinks(t *testing.T) {
 	if rec := withToken("POST", "/api/household/invites", "", created.Token); rec.Code != http.StatusForbidden {
 		t.Errorf("invite with a token = %d", rec.Code)
 	}
+	// Nor do they manage the account, its settings or its tokens.
+	for _, r := range []struct{ method, path, body string }{
+		{"GET", "/api/tokens", ""},
+		{"POST", "/api/tokens", `{"name":"Another"}`},
+		{"DELETE", fmt.Sprintf("/api/tokens/%d", created.ID), ""},
+		{"GET", "/api/settings", ""},
+		{"PUT", "/api/settings", `{"theme":"dark","notifyDays":"7","paperlessToken":"x"}`},
+		{"POST", "/api/settings/test-notification", `{"notifyUrls":"generic://example.com"}`},
+		{"POST", "/api/settings/test-paperless", `{"token":"x"}`},
+		{"POST", "/api/households", `{"name":"Cottage"}`},
+		{"POST", "/api/households/1/switch", ""},
+		{"DELETE", "/api/household/members/1", ""},
+	} {
+		if rec := withToken(r.method, r.path, r.body, created.Token); rec.Code != http.StatusForbidden {
+			t.Errorf("%s %s with a token = %d", r.method, r.path, rec.Code)
+		}
+	}
 
 	link := fmt.Sprintf("/api/things/%d/links", it.ID)
 	if rec := withToken("POST", link, `{"url":"https://warranteed.example.com/w/7","title":"Warranty"}`, created.Token); rec.Code != 201 {

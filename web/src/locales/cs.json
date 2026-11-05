@@ -252,7 +252,8 @@
     "connectCode": "Tenhle kód vypršel nebo už byl použit",
     "hookTokenOnly": "Kam posílat oznámení, může nastavit jen token aplikace",
     "hookNotConnected": "Oznámení jdou jen aplikacím připojeným přes Připojit",
-    "hookHost": "Oznámení můžou jít jen na {{host}}, adresu schválenou při připojení"
+    "hookHost": "Oznámení můžou jít jen na {{host}}, adresu schválenou při připojení",
+    "sessionOnly": "S API tokenem to nejde, přihlaste se"
   },
   "signIn": {
     "unreachable": "Poskytovatel identity není dostupný. Zkuste to za chvíli znovu.",

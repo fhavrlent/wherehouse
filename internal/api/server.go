@@ -61,19 +61,19 @@ func (s *Server) Handler() http.Handler {
 	api := http.NewServeMux()
 	api.HandleFunc("GET /api/me", s.me)
 	api.HandleFunc("GET /api/me/picture", s.mePicture)
-	api.HandleFunc("GET /api/settings", s.getSettings)
-	api.HandleFunc("PUT /api/settings", s.putSettings)
-	api.HandleFunc("POST /api/settings/test-notification", s.testNotification)
-	api.HandleFunc("POST /api/settings/test-paperless", s.testPaperless)
+	api.HandleFunc("GET /api/settings", sessionOnly(s.getSettings))
+	api.HandleFunc("PUT /api/settings", sessionOnly(s.putSettings))
+	api.HandleFunc("POST /api/settings/test-notification", sessionOnly(s.testNotification))
+	api.HandleFunc("POST /api/settings/test-paperless", sessionOnly(s.testPaperless))
 
 	api.HandleFunc("GET /api/households", s.listHouseholds)
-	api.HandleFunc("POST /api/households", s.createHousehold)
-	api.HandleFunc("POST /api/households/{id}/switch", s.switchHousehold)
+	api.HandleFunc("POST /api/households", sessionOnly(s.createHousehold))
+	api.HandleFunc("POST /api/households/{id}/switch", sessionOnly(s.switchHousehold))
 	api.HandleFunc("GET /api/household", s.currentHousehold)
 	api.HandleFunc("PUT /api/household", s.updateHousehold)
 	api.HandleFunc("POST /api/household/invites", s.createInvite)
 	api.HandleFunc("PUT /api/household/members/{user}", s.setRole)
-	api.HandleFunc("DELETE /api/household/members/{user}", s.removeMember)
+	api.HandleFunc("DELETE /api/household/members/{user}", sessionOnly(s.removeMember))
 	api.HandleFunc("GET /api/invites/{token}", s.getInvite)
 	api.HandleFunc("POST /api/invites/{token}/accept", s.acceptInvite)
 
@@ -117,9 +117,9 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("POST /api/connect", s.allowConnect)
 	api.HandleFunc("PUT /api/hook", s.setHook)
 	api.HandleFunc("DELETE /api/hook", s.removeHook)
-	api.HandleFunc("GET /api/tokens", s.listTokens)
-	api.HandleFunc("POST /api/tokens", s.createToken)
-	api.HandleFunc("DELETE /api/tokens/{id}", s.deleteToken)
+	api.HandleFunc("GET /api/tokens", sessionOnly(s.listTokens))
+	api.HandleFunc("POST /api/tokens", sessionOnly(s.createToken))
+	api.HandleFunc("DELETE /api/tokens/{id}", sessionOnly(s.deleteToken))
 
 	api.HandleFunc("GET /api/attachments/{id}/file", s.attachmentFile)
 	api.HandleFunc("PATCH /api/attachments/{id}", s.updateAttachment)
@@ -370,4 +370,16 @@ func userID(r *http.Request) int64 { return auth.UserFrom(r.Context()).ID }
 func isToken(r *http.Request) bool {
 	_, ok := auth.TokenHousehold(r.Context())
 	return ok
+}
+
+// sessionOnly refuses requests made with an API token: the account, its
+// settings and its tokens are only managed signed in.
+func sessionOnly(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if isToken(r) {
+			writeMsg(w, http.StatusForbidden, "server.sessionOnly", nil)
+			return
+		}
+		next(w, r)
+	}
 }

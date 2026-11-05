@@ -9,9 +9,11 @@ Authorization: Bearer wherehouse_…
 ```
 
 A token acts as the person who made it, in the household they were in when
-they made it. It never has admin or owner rights. Delete it in Settings to
-stop it working; it also stops when its owner leaves that household, or is
-removed from the allowed groups at the identity provider (checked hourly).
+they made it. It never has admin or owner rights, and can't manage the
+account: settings, API tokens, creating, switching or leaving households and
+accepting invites answer 403 to a token. Delete it in Settings to stop it
+working; it also stops when its owner leaves that household, or is removed
+from the allowed groups at the identity provider (checked hourly).
 
 Errors come as `{"error": "English text", "code": "server.…", "params": {…}}`
 with a 4xx or 5xx status.

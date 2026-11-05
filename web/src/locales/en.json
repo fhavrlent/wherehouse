@@ -246,7 +246,8 @@
     "connectCode": "This code has expired or was used already",
     "hookTokenOnly": "Only an app’s token can set where to ping it",
     "hookNotConnected": "Only apps connected through Connect can be pinged",
-    "hookHost": "Pings can only go to {{host}}, the address approved when connecting"
+    "hookHost": "Pings can only go to {{host}}, the address approved when connecting",
+    "sessionOnly": "An API token can’t do that; sign in instead"
   },
   "signIn": {
     "unreachable": "Could not reach the identity provider. Try again in a moment.",
