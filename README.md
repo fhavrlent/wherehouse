@@ -91,6 +91,7 @@ Apps such as Warranteed use Wherehouse with an API token from **Settings → API
 | `PAPERLESS_URL` | | Paperless-ngx URL |
 | `PAPERLESS_TOKEN` | | API token used for admins only |
 | `PAPERLESS_PUBLIC_URL` | `PAPERLESS_URL` | Paperless URL used for browser links |
+| `PAPERLESS_FIELD` | `Wherehouse` | Paperless URL custom field that links documents back here |
 | `TZ` | | Timezone |
 | `WHEREHOUSE_NOTIFY_HOUR` | `9` | Hour (0–23) after which reminders are sent |
 | `WHEREHOUSE_NOTIFY_ALLOWED_HOSTS` | | Comma-separated hosts non-admins may use with self-hosted notification services |

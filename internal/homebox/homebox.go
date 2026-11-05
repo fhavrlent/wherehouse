@@ -5,6 +5,7 @@ package homebox
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -200,10 +201,19 @@ func (c *Client) OpenAttachment(ctx context.Context, itemID, attachmentID string
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.Token)
-	// A link attachment answers with a redirect to where it points. That
-	// place may not be reachable from here, so it is reported, not followed.
+	// HomeBox may redirect to the file on its own host, which is followed. A
+	// link attachment redirects to another host, which may not be reachable
+	// from here, so it is reported instead.
 	hc := *c.HTTP
-	hc.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	hc.CheckRedirect = func(next *http.Request, via []*http.Request) error {
+		if !strings.EqualFold(next.URL.Host, req.URL.Host) {
+			return http.ErrUseLastResponse
+		}
+		if len(via) >= 10 {
+			return errors.New("too many redirects")
+		}
+		return nil
+	}
 	res, err := hc.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("could not reach HomeBox: %w", err)

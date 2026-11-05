@@ -103,6 +103,15 @@ func Load() (*Config, error) {
 		Location:    loc,
 		DevLogin:    envBool("WHEREHOUSE_DEV_LOGIN", false, &errs),
 		Secret:      os.Getenv("WHEREHOUSE_SECRET"),
+		NotifyHour:  envInt("WHEREHOUSE_NOTIFY_HOUR", 9, &errs),
+
+		NotifyAllowedHosts: list(os.Getenv("WHEREHOUSE_NOTIFY_ALLOWED_HOSTS")),
+		Paperless: Paperless{
+			URL:       strings.TrimSuffix(os.Getenv("PAPERLESS_URL"), "/"),
+			PublicURL: strings.TrimSuffix(os.Getenv("PAPERLESS_PUBLIC_URL"), "/"),
+			Token:     os.Getenv("PAPERLESS_TOKEN"),
+			Field:     env("PAPERLESS_FIELD", "Wherehouse"),
+		},
 		OIDC: OIDC{
 			Issuer:           strings.TrimSuffix(os.Getenv("OIDC_ISSUER"), "/"),
 			ClientID:         os.Getenv("OIDC_CLIENT_ID"),

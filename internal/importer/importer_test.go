@@ -63,6 +63,8 @@ func fakeHomeBox(t *testing.T) *httptest.Server {
 			"fields": []any{map[string]any{"type": "text", "name": "Voltage", "textValue": "18 V"}},
 			"attachments": []any{
 				map[string]any{"id": "a1", "title": "manual.pdf", "type": "manual", "mimeType": "application/pdf"},
+				// HomeBox redirects to some files on its own host.
+				map[string]any{"id": "a6", "title": "warranty.pdf", "type": "warranty", "mimeType": "application/pdf"},
 				map[string]any{"id": "a2", "title": "drill.png", "type": "photo", "primary": true, "mimeType": "image/png"},
 				map[string]any{"id": "a3", "title": "Shop page", "type": "attachment", "sourceType": "external"},
 				// Links HomeBox answers with a redirect; neither place is reachable.
@@ -101,6 +103,8 @@ func fakeHomeBox(t *testing.T) *httptest.Server {
 		case p == "/entities/drill/attachments/a1":
 			w.Header().Set("Content-Type", "application/pdf")
 			w.Write([]byte("%PDF-1.4"))
+		case p == "/entities/drill/attachments/a6":
+			http.Redirect(w, r, "/api/v1/entities/drill/attachments/a1", http.StatusFound)
 		case p == "/entities/drill/attachments/a4":
 			http.Redirect(w, r, "https://paperless.invalid/documents/7/details", http.StatusFound)
 		case p == "/entities/drill/attachments/a5":
@@ -148,7 +152,7 @@ func TestImport(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := im.Progress()
-	if p.Things != 5 || p.Photos != 1 || p.Documents != 2 || p.Maintenance != 2 || len(p.Errors) != 0 {
+	if p.Things != 5 || p.Photos != 1 || p.Documents != 3 || p.Maintenance != 2 || len(p.Errors) != 0 {
 		t.Fatalf("progress = %+v", p)
 	}
 
@@ -180,7 +184,7 @@ func TestImport(t *testing.T) {
 	if len(drill.Fields) != 1 || drill.Fields[0].Value != "18 V" {
 		t.Errorf("drill fields = %+v", drill.Fields)
 	}
-	if len(drill.Attachments) != 2 || len(drill.Maintenance) != 2 {
+	if len(drill.Attachments) != 3 || len(drill.Maintenance) != 2 {
 		t.Errorf("drill documents %+v, maintenance %+v", drill.Attachments, drill.Maintenance)
 	}
 	for _, a := range drill.Attachments {
@@ -188,7 +192,7 @@ func TestImport(t *testing.T) {
 			a.MimeType != "application/pdf") {
 			t.Errorf("paperless link = %+v", a)
 		}
-		if a.Storage == store.StorageLocal && a.Kind != "manual" {
+		if a.Storage == store.StorageLocal && a.Kind != "manual" && a.Kind != "warranty" {
 			t.Errorf("local document = %+v", a)
 		}
 	}
