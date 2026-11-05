@@ -412,6 +412,7 @@ const HomeBoxImport = () => {
               things: p.things,
               photos: p.photos,
               documents: p.documents,
+              links: p.links,
               maintenance: p.maintenance,
               skipped: p.skipped,
             })}

@@ -98,7 +98,7 @@
       "tokenHint": "Make one in HomeBox under Profile. It isn’t saved.",
       "start": "Import",
       "running": "Importing…",
-      "counts": "{{things}} things, {{photos}} photos, {{documents}} documents, {{maintenance}} maintenance entries; {{skipped}} already here",
+      "counts": "{{things}} things, {{photos}} photos, {{documents}} documents, {{links}} links, {{maintenance}} maintenance entries; {{skipped}} already here",
       "problems_one": "{{count}} problem",
       "problems_other": "{{count}} problems"
     },

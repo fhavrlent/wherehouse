@@ -3,9 +3,8 @@ package api
 import (
 	"context"
 	"fmt"
-	"log/slog"
-
 	"io"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -244,9 +243,18 @@ func (s *Server) attachmentFile(w http.ResponseWriter, r *http.Request) {
 	if a.AddedBy != nil {
 		owner = *a.AddedBy
 	}
+	if a.PaperlessDocID == nil || s.cfg.Paperless.URL == "" {
+		writeMsg(w, http.StatusNotFound, "server.paperlessNotConfigured", nil)
+		return
+	}
+	// Without a token here, or if Paperless can't be reached from here, the
+	// document opens in Paperless itself, which asks for its own sign-in.
+	inPaperless := func() {
+		http.Redirect(w, r, fmt.Sprintf("%s/documents/%d/details", s.cfg.Paperless.PublicURL, *a.PaperlessDocID), http.StatusFound)
+	}
 	pc, err := s.userPaperless(r.Context(), owner)
-	if err != nil || pc == nil || a.PaperlessDocID == nil {
-		writeMsg(w, http.StatusBadGateway, "server.paperlessNotConfigured", nil)
+	if err != nil || pc == nil {
+		inPaperless()
 		return
 	}
 	variant := "preview"
@@ -254,12 +262,13 @@ func (s *Server) attachmentFile(w http.ResponseWriter, r *http.Request) {
 		variant = "download"
 	}
 	resp, err := pc.Stream(r.Context(), *a.PaperlessDocID, variant)
+	if paperless.IsNotFound(err) {
+		writeMsg(w, http.StatusNotFound, "server.paperlessGone", nil)
+		return
+	}
 	if err != nil {
-		status := http.StatusBadGateway
-		if paperless.IsNotFound(err) {
-			status, err = http.StatusNotFound, i18n.NewError("server.paperlessGone", nil)
-		}
-		writeErr(w, status, err)
+		slog.Warn("paperless document", "doc", *a.PaperlessDocID, "err", err)
+		inPaperless()
 		return
 	}
 	defer resp.Body.Close()

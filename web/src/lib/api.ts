@@ -258,6 +258,7 @@ export interface ImportProgress {
   things: number;
   photos: number;
   documents: number;
+  links: number;
   maintenance: number;
   skipped: number;
   errors: string[];

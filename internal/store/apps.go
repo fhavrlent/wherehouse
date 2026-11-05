@@ -86,6 +86,11 @@ func (s *Store) SetAppLink(ctx context.Context, hh, thing int64, source string, 
 			AND thing_id IN (SELECT id FROM things WHERE household_id = ?)`, source, in.ExternalID, thing, hh); err != nil {
 			return err
 		}
+		// A plain link to the same page, e.g. copied from elsewhere, is
+		// replaced by the app's.
+		if _, err := tx.ExecContext(ctx, `DELETE FROM thing_links WHERE thing_id = ? AND source = '' AND url = ?`, thing, in.URL); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO thing_links (thing_id, url, title, source, external_id, data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT (thing_id, source) WHERE source <> '' DO UPDATE SET

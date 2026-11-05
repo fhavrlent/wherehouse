@@ -35,6 +35,7 @@ type Progress struct {
 	Things      int      `json:"things"`
 	Photos      int      `json:"photos"`
 	Documents   int      `json:"documents"`
+	Links       int      `json:"links"`
 	Maintenance int      `json:"maintenance"`
 	Skipped     int      `json:"skipped"`
 	Errors      []string `json:"errors"`
@@ -189,6 +190,7 @@ func (im *Importer) thing(ctx context.Context, n homebox.Node, parent *int64) (i
 	if id, err := im.st.Imported(ctx, im.hh, n.ID); err != nil || id != 0 {
 		if id != 0 {
 			im.update(func(p *Progress) { p.Skipped++ })
+			im.copyLinks(ctx, n.ID, id)
 		}
 		return id, err
 	}
@@ -286,11 +288,36 @@ func (im *Importer) copyFiles(ctx context.Context, e *homebox.Entity, thing int6
 		}
 	}
 	for _, a := range atts {
-		if a.SourceType == "external" || a.SourceType == "link" {
+		err := im.file(ctx, e.ID, a, thing)
+		// A link HomeBox can't send on has nothing to copy.
+		if err != nil && a.SourceType != "external" && a.SourceType != "link" {
+			im.problem(e.Name+" / "+a.Title, err)
+		}
+	}
+}
+
+// copyLinks adds the links of a thing imported before that aren't here yet,
+// so running the import again brings them over too. Files are not copied
+// again.
+func (im *Importer) copyLinks(ctx context.Context, entity string, thing int64) {
+	e, err := im.hb.Entity(ctx, entity)
+	if err != nil {
+		im.problem(entity, err)
+		return
+	}
+	for _, a := range e.Attachments {
+		if a.Type == "photo" {
 			continue
 		}
-		if err := im.file(ctx, e.ID, a, thing); err != nil {
-			im.problem(e.Name+" / "+a.Title, err)
+		res, err := im.hb.OpenAttachment(ctx, entity, a.ID)
+		var link *homebox.LinkError
+		switch {
+		case errors.As(err, &link):
+			if err := im.link(ctx, link.URL, a, thing); err != nil {
+				im.problem(e.Name+" / "+a.Title, err)
+			}
+		case err == nil:
+			res.Body.Close()
 		}
 	}
 }
@@ -349,14 +376,29 @@ func (im *Importer) file(ctx context.Context, entity string, a homebox.Attachmen
 var paperlessDoc = regexp.MustCompile(`/documents/(\d+)(/|$)`)
 
 // link keeps a link to a document in the household's Paperless as that
-// document. Other links have nothing to copy and are left out.
+// document, and any other link as a link.
 func (im *Importer) link(ctx context.Context, target string, a homebox.Attachment, thing int64) error {
 	u, err := url.Parse(target)
-	if err != nil {
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 		return nil
 	}
 	m := paperlessDoc.FindStringSubmatch(u.Path)
 	if m == nil || !im.isPaperless(u) {
+		title := a.Title
+		if title == target || strings.Contains(title, "/") {
+			title = ""
+		}
+		// Kept as it is if it's here already, maybe as an app's own link.
+		if have, err := im.st.HasLink(ctx, thing, target); err != nil || have {
+			return err
+		}
+		if title != "" {
+			title = name(title)
+		}
+		if _, err := im.st.AddLink(ctx, im.hh, thing, target, title); err != nil {
+			return err
+		}
+		im.update(func(p *Progress) { p.Links++ })
 		return nil
 	}
 	docID, err := strconv.ParseInt(m[1], 10, 64)
@@ -382,6 +424,11 @@ func (im *Importer) link(ctx context.Context, target string, a homebox.Attachmen
 		Filename: name(filename), MimeType: mimeType, PaperlessDocID: &docID, AddedBy: &im.user})
 	if err == nil {
 		im.update(func(p *Progress) { p.Documents++ })
+	}
+	// Already here from an earlier run.
+	var ve *store.ValidationError
+	if errors.As(err, &ve) && ve.Key == "server.alreadyLinked" {
+		return nil
 	}
 	return err
 }

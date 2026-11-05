@@ -210,6 +210,17 @@ func checkURL(raw string) error {
 	return nil
 }
 
+// HasLink reports whether a thing links to a web address, as a link of its
+// own or an app's.
+func (s *Store) HasLink(ctx context.Context, thing int64, rawURL string) (bool, error) {
+	var one int
+	err := s.db.QueryRowContext(ctx, `SELECT 1 FROM thing_links WHERE thing_id = ? AND url = ?`, thing, strings.TrimSpace(rawURL)).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 // DeleteLink removes a link. Removing an app's link also gives the purchase
 // details it owned back to this app.
 func (s *Store) DeleteLink(ctx context.Context, hh, id int64) error {

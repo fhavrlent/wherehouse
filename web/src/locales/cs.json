@@ -100,7 +100,7 @@
       "tokenHint": "Vytvoříte ho v HomeBoxu v Profilu. Neukládá se.",
       "start": "Importovat",
       "running": "Importuje se…",
-      "counts": "{{things}} věcí, {{photos}} fotek, {{documents}} dokumentů, {{maintenance}} záznamů údržby; {{skipped}} už tu bylo",
+      "counts": "{{things}} věcí, {{photos}} fotek, {{documents}} dokumentů, {{links}} odkazů, {{maintenance}} záznamů údržby; {{skipped}} už tu bylo",
       "problems_one": "{{count}} problém",
       "problems_few": "{{count}} problémy",
       "problems_many": "{{count}} problému",

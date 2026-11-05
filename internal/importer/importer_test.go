@@ -70,6 +70,7 @@ func fakeHomeBox(t *testing.T) *httptest.Server {
 				// Links HomeBox answers with a redirect; neither place is reachable.
 				map[string]any{"id": "a4", "title": "receipt.pdf", "type": "receipt"},
 				map[string]any{"id": "a5", "title": "Elsewhere", "type": "attachment"},
+				map[string]any{"id": "a7", "title": "https://warranty.invalid/w/7", "type": "warranty", "sourceType": "link"},
 			},
 		},
 	}
@@ -109,6 +110,8 @@ func fakeHomeBox(t *testing.T) *httptest.Server {
 			http.Redirect(w, r, "https://paperless.invalid/documents/7/details", http.StatusFound)
 		case p == "/entities/drill/attachments/a5":
 			http.Redirect(w, r, "https://elsewhere.invalid/page", http.StatusFound)
+		case p == "/entities/drill/attachments/a7":
+			http.Redirect(w, r, "https://warranty.invalid/w/7", http.StatusFound)
 		case p == "/entities/drill/attachments/a2":
 			w.Header().Set("Content-Type", "image/png")
 			w.Write(photo.Bytes())
@@ -152,7 +155,7 @@ func TestImport(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := im.Progress()
-	if p.Things != 5 || p.Photos != 1 || p.Documents != 3 || p.Maintenance != 2 || len(p.Errors) != 0 {
+	if p.Things != 5 || p.Photos != 1 || p.Documents != 3 || p.Links != 2 || p.Maintenance != 2 || len(p.Errors) != 0 {
 		t.Fatalf("progress = %+v", p)
 	}
 
@@ -196,6 +199,14 @@ func TestImport(t *testing.T) {
 			t.Errorf("local document = %+v", a)
 		}
 	}
+	// Other links are kept as links, named by their title unless it's the address.
+	links := map[string]string{}
+	for _, l := range drill.Links {
+		links[l.URL] = l.Title
+	}
+	if len(links) != 2 || links["https://elsewhere.invalid/page"] != "Elsewhere" || links["https://warranty.invalid/w/7"] != "" {
+		t.Errorf("drill links = %+v", drill.Links)
+	}
 	hammer, _ := st.FromHomeBox(ctx, hh, "hammer")
 	if hammer.Quantity != 2 || len(hammer.Path) != 3 || hammer.Path[2].Name != "Toolbox" {
 		t.Errorf("hammer = %+v", hammer)
@@ -205,12 +216,29 @@ func TestImport(t *testing.T) {
 		t.Errorf("garage label = %q", garage.Label)
 	}
 
+	// Running it again brings over links missing here, and only those: one
+	// an app took over stays the app's.
+	for _, l := range drill.Links {
+		if l.URL == "https://elsewhere.invalid/page" {
+			if err := st.DeleteLink(ctx, hh, l.ID); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := st.SetAppLink(ctx, hh, drill.ID, "warranteed", store.AppLinkInput{ExternalID: "7", URL: "https://warranty.invalid/w/7"}); err != nil {
+		t.Fatal(err)
+	}
 	again := New(st, homebox.New(hb.URL, "key"), dirFiles{dir}, hh, u.ID)
+	again.PaperlessURLs = im.PaperlessURLs
 	if err := again.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if p := again.Progress(); p.Things != 0 || p.Skipped != 5 {
+	if p := again.Progress(); p.Things != 0 || p.Skipped != 5 || p.Links != 1 || p.Documents != 0 || len(p.Errors) != 0 {
 		t.Errorf("second import = %+v", p)
+	}
+	drill, _ = st.FromHomeBox(ctx, hh, "drill")
+	if len(drill.Links) != 2 || len(drill.Attachments) != 3 {
+		t.Errorf("drill after the second import: links %+v, documents %+v", drill.Links, drill.Attachments)
 	}
 	if res, _ := st.Search(ctx, hh, "makita", false); len(res) != 1 {
 		t.Errorf("search after import = %+v", res)

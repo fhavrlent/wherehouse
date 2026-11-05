@@ -29,6 +29,8 @@ func TestPaperlessLinkBack(t *testing.T) {
 			w.Write([]byte(`{}`))
 		case r.URL.Path == "/api/documents/7/" && r.URL.Query().Get("fields") == "custom_fields":
 			w.Write([]byte(`{"custom_fields":[]}`))
+		case r.URL.Path == "/api/documents/7/preview/":
+			w.WriteHeader(http.StatusInternalServerError)
 		case r.URL.Path == "/api/documents/7/":
 			w.Write([]byte(`{"id":7,"title":"Receipt","original_file_name":"r.pdf","mime_type":"application/pdf","created":"2026-01-01"}`))
 		case r.URL.Path == "/api/custom_fields/" && r.Method == "GET":
@@ -71,6 +73,13 @@ func TestPaperlessLinkBack(t *testing.T) {
 	if len(things) != 1 || things[0].ID != tv.ID {
 		t.Errorf("things with the document = %+v", things)
 	}
+	// A document Paperless won't hand over here opens in Paperless itself.
+	tv = decodeAs[store.Thing](t, mustCall(t, h, c, "GET", fmt.Sprintf("/api/things/%d", tv.ID), "", 200))
+	rec := mustCall(t, h, c, "GET", fmt.Sprintf("/api/attachments/%d/file", tv.Attachments[0].ID), "", http.StatusFound)
+	if loc := rec.Header().Get("Location"); loc != pl.URL+"/documents/7/details" {
+		t.Errorf("opened at %q", loc)
+	}
+
 	var got map[string]any
 	json.Unmarshal(mustCall(t, h, c, "GET", "/api/settings", "", 200).Body.Bytes(), &got)
 	if got["paperlessBacklinks"] != true {
