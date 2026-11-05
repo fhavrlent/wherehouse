@@ -65,6 +65,9 @@ func fakeHomeBox(t *testing.T) *httptest.Server {
 				map[string]any{"id": "a1", "title": "manual.pdf", "type": "manual", "mimeType": "application/pdf"},
 				map[string]any{"id": "a2", "title": "drill.png", "type": "photo", "primary": true, "mimeType": "image/png"},
 				map[string]any{"id": "a3", "title": "Shop page", "type": "attachment", "sourceType": "external"},
+				// Links HomeBox answers with a redirect; neither place is reachable.
+				map[string]any{"id": "a4", "title": "receipt.pdf", "type": "receipt"},
+				map[string]any{"id": "a5", "title": "Elsewhere", "type": "attachment"},
 			},
 		},
 	}
@@ -98,6 +101,10 @@ func fakeHomeBox(t *testing.T) *httptest.Server {
 		case p == "/entities/drill/attachments/a1":
 			w.Header().Set("Content-Type", "application/pdf")
 			w.Write([]byte("%PDF-1.4"))
+		case p == "/entities/drill/attachments/a4":
+			http.Redirect(w, r, "https://paperless.invalid/documents/7/details", http.StatusFound)
+		case p == "/entities/drill/attachments/a5":
+			http.Redirect(w, r, "https://elsewhere.invalid/page", http.StatusFound)
 		case p == "/entities/drill/attachments/a2":
 			w.Header().Set("Content-Type", "image/png")
 			w.Write(photo.Bytes())
@@ -132,6 +139,7 @@ func TestImport(t *testing.T) {
 	}
 
 	im := New(st, homebox.New(hb.URL, "key"), dirFiles{dir}, hh, u.ID)
+	im.PaperlessURLs = []string{"http://paperless:8000", "https://paperless.invalid"}
 	// Before anything goes wrong the problems list is empty, not null, so the page can read it.
 	if b, _ := json.Marshal(im.Progress()); !strings.Contains(string(b), `"errors":[]`) {
 		t.Fatalf("fresh progress = %s", b)
@@ -140,7 +148,7 @@ func TestImport(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := im.Progress()
-	if p.Things != 5 || p.Photos != 1 || p.Documents != 1 || p.Maintenance != 2 || len(p.Errors) != 0 {
+	if p.Things != 5 || p.Photos != 1 || p.Documents != 2 || p.Maintenance != 2 || len(p.Errors) != 0 {
 		t.Fatalf("progress = %+v", p)
 	}
 
@@ -172,8 +180,17 @@ func TestImport(t *testing.T) {
 	if len(drill.Fields) != 1 || drill.Fields[0].Value != "18 V" {
 		t.Errorf("drill fields = %+v", drill.Fields)
 	}
-	if len(drill.Attachments) != 1 || drill.Attachments[0].Kind != "manual" || len(drill.Maintenance) != 2 {
+	if len(drill.Attachments) != 2 || len(drill.Maintenance) != 2 {
 		t.Errorf("drill documents %+v, maintenance %+v", drill.Attachments, drill.Maintenance)
+	}
+	for _, a := range drill.Attachments {
+		if a.Storage == store.StoragePaperless && (a.Kind != "receipt" || a.PaperlessDocID == nil || *a.PaperlessDocID != 7 ||
+			a.MimeType != "application/pdf") {
+			t.Errorf("paperless link = %+v", a)
+		}
+		if a.Storage == store.StorageLocal && a.Kind != "manual" {
+			t.Errorf("local document = %+v", a)
+		}
 	}
 	hammer, _ := st.FromHomeBox(ctx, hh, "hammer")
 	if hammer.Quantity != 2 || len(hammer.Path) != 3 || hammer.Path[2].Name != "Toolbox" {

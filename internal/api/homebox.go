@@ -51,6 +51,7 @@ func (s *Server) importHomeBox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	im := importer.New(s.store, hb, s.files, household(r), userID(r))
+	im.PaperlessURLs = []string{s.cfg.Paperless.URL, s.cfg.Paperless.PublicURL}
 	s.importer = im
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)

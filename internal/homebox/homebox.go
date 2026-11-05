@@ -187,6 +187,11 @@ func (c *Client) Maintenance(ctx context.Context, id string) ([]Maintenance, err
 	return out, err
 }
 
+// LinkError is returned for an attachment that is a link to elsewhere.
+type LinkError struct{ URL string }
+
+func (e *LinkError) Error() string { return "attachment is a link to " + e.URL }
+
 // OpenAttachment fetches an item's file or photo; the caller closes the body.
 func (c *Client) OpenAttachment(ctx context.Context, itemID, attachmentID string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
@@ -195,9 +200,21 @@ func (c *Client) OpenAttachment(ctx context.Context, itemID, attachmentID string
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.Token)
-	res, err := c.HTTP.Do(req)
+	// A link attachment answers with a redirect to where it points. That
+	// place may not be reachable from here, so it is reported, not followed.
+	hc := *c.HTTP
+	hc.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	res, err := hc.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("could not reach HomeBox: %w", err)
+	}
+	if res.StatusCode >= 300 && res.StatusCode < 400 && res.Header.Get("Location") != "" {
+		res.Body.Close()
+		loc, err := req.URL.Parse(res.Header.Get("Location"))
+		if err != nil {
+			return nil, err
+		}
+		return nil, &LinkError{URL: loc.String()}
 	}
 	if res.StatusCode >= 300 {
 		defer res.Body.Close()

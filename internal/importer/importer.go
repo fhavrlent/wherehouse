@@ -9,7 +9,9 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"net/url"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,6 +46,10 @@ type Progress struct {
 const maxErrors = 50
 
 type Importer struct {
+	// PaperlessURLs are the addresses of the household's Paperless. Links to
+	// its documents become Paperless documents here.
+	PaperlessURLs []string
+
 	st    *store.Store
 	hb    *homebox.Client
 	files Files
@@ -291,6 +297,10 @@ func (im *Importer) copyFiles(ctx context.Context, e *homebox.Entity, thing int6
 
 func (im *Importer) file(ctx context.Context, entity string, a homebox.Attachment, thing int64) error {
 	res, err := im.hb.OpenAttachment(ctx, entity, a.ID)
+	var link *homebox.LinkError
+	if errors.As(err, &link) {
+		return im.link(ctx, link.URL, a, thing)
+	}
 	if err != nil {
 		return err
 	}
@@ -334,6 +344,55 @@ func (im *Importer) file(ctx context.Context, entity string, a homebox.Attachmen
 		im.files.Remove(file)
 	}
 	return err
+}
+
+var paperlessDoc = regexp.MustCompile(`/documents/(\d+)(/|$)`)
+
+// link keeps a link to a document in the household's Paperless as that
+// document. Other links have nothing to copy and are left out.
+func (im *Importer) link(ctx context.Context, target string, a homebox.Attachment, thing int64) error {
+	u, err := url.Parse(target)
+	if err != nil {
+		return nil
+	}
+	m := paperlessDoc.FindStringSubmatch(u.Path)
+	if m == nil || !im.isPaperless(u) {
+		return nil
+	}
+	docID, err := strconv.ParseInt(m[1], 10, 64)
+	if err != nil {
+		return nil
+	}
+	filename := a.Title
+	if filename == "" || strings.Contains(filename, "/") {
+		filename = fmt.Sprintf("Paperless %d", docID)
+	}
+	mimeType := a.MimeType
+	if mimeType == "" {
+		mimeType = mime.TypeByExtension(strings.ToLower(filepath.Ext(filename)))
+	}
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+	kind := a.Type
+	if !store.ValidKind(kind) {
+		kind = "other"
+	}
+	err = im.st.AddAttachment(ctx, im.hh, &store.Attachment{ThingID: thing, Kind: kind, Storage: store.StoragePaperless,
+		Filename: name(filename), MimeType: mimeType, PaperlessDocID: &docID, AddedBy: &im.user})
+	if err == nil {
+		im.update(func(p *Progress) { p.Documents++ })
+	}
+	return err
+}
+
+func (im *Importer) isPaperless(u *url.URL) bool {
+	for _, s := range im.PaperlessURLs {
+		if p, err := url.Parse(s); err == nil && p.Host != "" && strings.EqualFold(p.Host, u.Host) {
+			return true
+		}
+	}
+	return false
 }
 
 func (im *Importer) maintenance(ctx context.Context, e *homebox.Entity, thing int64) {
