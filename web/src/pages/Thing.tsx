@@ -120,7 +120,7 @@ const ThingView = ({ thing }: { thing: ThingDetail }) => {
     ],
     [t("thingForm.purchaseFrom"), thing.purchaseFrom],
     [t("thingForm.warrantyUntil"), thing.lifetimeWarranty ? t("thing.lifetime") : (thing.warrantyUntil ?? "")],
-    [t("thingForm.warrantyDetails"), lines(thing.warrantyDetails)],
+    ...detailRows(t("thingForm.warrantyDetails"), thing.warrantyDetails),
     [t("thingForm.insured"), thing.insured && t("item.yes")],
     [t("thingForm.soldDate"), thing.soldDate ?? ""],
     [t("thingForm.soldPrice"), thing.soldPrice !== null && money(thing.soldPrice)],
@@ -359,6 +359,22 @@ const FieldValueView = ({ type, value }: { type: FieldType; value: string }) => 
 
 /** Old place links lead to the same page. */
 export const PlaceRedirect = () => <Navigate to={`/i/${useParams().id ?? ""}`} replace />;
+
+/**
+ * Rows for text that may have several lines. A line like "Order number: 123"
+ * (as Warranteed writes them) is a row of its own, with its label beside the
+ * others; the rest stays under label.
+ */
+const detailRows = (label: string, text: string): [string, ReactNode][] => {
+  const rest: string[] = [];
+  const own: [string, ReactNode][] = [];
+  for (const line of text.split("\n")) {
+    const [, name, value] = /^([^:]{1,40}):\s+(.+)$/.exec(line.trim()) ?? [];
+    if (name && value && !/^https?$/i.test(name)) own.push([name, value]);
+    else if (line.trim()) rest.push(line);
+  }
+  return [[label, lines(rest.join("\n"))], ...own];
+};
 
 /** Text that may have several lines, kept as they are; "" when there's none. */
 const lines = (text: string) => text && <span className="whitespace-pre-line">{text}</span>;
