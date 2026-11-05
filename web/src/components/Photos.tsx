@@ -38,25 +38,36 @@ export const Photos = ({ id, photos }: { id: number; photos: Photo[] }) => {
     invalidate();
   };
 
+  const cover = photos[0];
   return (
-    <div className="flex flex-wrap gap-2">
-      {photos.map((p, i) => (
+    <div className="flex flex-col gap-2">
+      {cover && (
         <button
-          key={p.id}
           type="button"
-          onClick={() => setShown(p)}
-          className={
-            "relative cursor-zoom-in overflow-hidden rounded-xl bg-surface-3 " +
-            (i === 0 ? "size-40" : "size-24 sm:size-28")
-          }
+          onClick={() => setShown(cover)}
+          aria-label={t("photos.title")}
+          className="aspect-video w-full cursor-zoom-in overflow-hidden rounded-2xl border border-border bg-surface-3 lg:aspect-[4/3]"
         >
-          <img src={photoUrl(p.id, true)} alt="" loading="lazy" className="size-full object-cover" />
+          <img src={photoUrl(cover.id, true)} alt="" className="size-full object-cover" />
         </button>
-      ))}
-      <PhotoInput onFiles={add} className={photos.length ? "size-24 sm:size-28" : "h-28 w-full sm:w-56"}>
-        {uploading ? <Loader2 className="size-5 animate-spin" /> : <ImagePlus className="size-5" />}
-        {!photos.length && t("photos.add")}
-      </PhotoInput>
+      )}
+      <div className={photos.length ? "grid grid-cols-4 gap-2" : undefined}>
+        {photos.slice(1).map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => setShown(p)}
+            aria-label={t("photos.title")}
+            className="aspect-square cursor-zoom-in overflow-hidden rounded-xl bg-surface-3"
+          >
+            <img src={photoUrl(p.id, true)} alt="" loading="lazy" className="size-full object-cover" />
+          </button>
+        ))}
+        <PhotoInput onFiles={add} className={photos.length ? "aspect-square !py-0" : "h-24 w-full rounded-2xl"}>
+          {uploading ? <Loader2 className="size-5 animate-spin" /> : <ImagePlus className="size-5" />}
+          {photos.length ? <span className="sr-only">{t("photos.add")}</span> : t("photos.add")}
+        </PhotoInput>
+      </div>
       <Dialog
         open={shown !== null}
         onOpenChange={(o) => !o && setShown(null)}

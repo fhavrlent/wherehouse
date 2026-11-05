@@ -545,7 +545,8 @@
     "saveTemplate": "Uložit jako šablonu",
     "templateSaved": "Uloženo jako šablona. Vyberete ji při přidávání věci.",
     "template": "Šablona",
-    "fromApp": "Z {{app}}"
+    "fromApp": "Z {{app}}",
+    "details": "Podrobnosti"
   },
   "thingForm": {
     "editTitle": "Upravit",

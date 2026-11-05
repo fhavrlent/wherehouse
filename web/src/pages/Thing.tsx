@@ -29,7 +29,7 @@ import { Breadcrumbs, Contents } from "@/components/Things";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
-import { Card } from "@/components/ui/misc";
+import { Card, CardHeader } from "@/components/ui/misc";
 import { api, errorMessage, isPlace, pathText, type FieldType, type ThingDetail } from "@/lib/api";
 import { appName } from "@/lib/apps";
 import { kindName } from "@/lib/kinds";
@@ -139,7 +139,7 @@ const ThingView = ({ thing }: { thing: ThingDetail }) => {
               <KindIcon icon={thing.kind.icon} />
             </span>
             <div className="min-w-0">
-              <h1 className="truncate text-2xl font-semibold tracking-tight">{thing.name}</h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-balance break-words">{thing.name}</h1>
               <p className="flex flex-wrap items-center gap-1.5 text-xs text-fg-subtle">
                 {kindName(thing.kind, t)}
                 {thing.archivedAt && <span className="rounded bg-surface-3 px-1.5 py-0.5">{t("item.archived")}</span>}
@@ -241,56 +241,63 @@ const ThingView = ({ thing }: { thing: ThingDetail }) => {
         )}
       </div>
 
-      <Photos id={thing.id} photos={thing.photos ?? []} />
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_1fr] lg:items-start lg:gap-x-6">
+        <div className="lg:col-start-2">
+          <Photos id={thing.id} photos={thing.photos ?? []} />
+        </div>
 
-      <Contents things={thing.contents} showPath={false} />
-      {place && thing.contents.length === 0 && (
-        <Card className="px-6 py-8 text-center text-sm text-fg-muted">{t("place.emptyBody")}</Card>
-      )}
-
-      {(shown(details).length > 0 || shown(purchase).length > 0 || thing.description || thing.notes) && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-span-2 lg:row-start-1">
+          {thing.contents.length > 0 && (
+            <div className="flex flex-col gap-6">
+              <Contents things={thing.contents} showPath={false} />
+            </div>
+          )}
+          {place && thing.contents.length === 0 && (
+            <Card className="px-6 py-8 text-center text-sm text-fg-muted">{t("place.emptyBody")}</Card>
+          )}
           {(shown(details).length > 0 || thing.description) && (
-            <Card className="p-5">
-              <Details rows={shown(details)} />
-              {thing.description && (
-                <p className="mt-4 border-t border-border pt-4 text-sm whitespace-pre-line first:mt-0 first:border-0 first:pt-0">
-                  {thing.description}
-                </p>
-              )}
+            <Card className="overflow-hidden">
+              <CardHeader title={t("thing.details")} />
+              <div className="p-4">
+                {thing.description && (
+                  <p className="text-sm whitespace-pre-line [&:not(:last-child)]:mb-4">{thing.description}</p>
+                )}
+                <Details rows={shown(details)} />
+              </div>
             </Card>
           )}
           {shown(purchase).length > 0 && (
-            <Card className="p-5">
-              <h2 className="mb-3 flex items-center justify-between gap-2 text-xs font-semibold text-fg-muted">
-                {t("thingForm.purchase")}
+            <Card className="overflow-hidden">
+              <CardHeader title={t("thingForm.purchase")}>
                 {owner && (
                   <a
                     href={owner.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-normal text-primary hover:underline"
+                    className="rounded-md px-2 py-1 text-[13px] text-primary hover:bg-surface-3"
                   >
                     {t("thing.fromApp", { app: appName(thing.purchaseOwner) })}
                   </a>
                 )}
-              </h2>
-              <Details rows={shown(purchase)} />
+              </CardHeader>
+              <div className="p-4">
+                <Details rows={shown(purchase)} />
+              </div>
             </Card>
           )}
           {thing.notes && (
-            <Card className="p-5">
-              <h2 className="text-xs font-semibold text-fg-muted">{t("thingForm.notes")}</h2>
-              <p className="mt-2 text-sm whitespace-pre-line">{thing.notes}</p>
+            <Card className="overflow-hidden">
+              <CardHeader title={t("thingForm.notes")} />
+              <p className="p-4 text-sm whitespace-pre-line">{thing.notes}</p>
             </Card>
           )}
+          <MaintenanceLog thingId={thing.id} entries={thing.maintenance ?? []} />
         </div>
-      )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <MaintenanceLog thingId={thing.id} entries={thing.maintenance ?? []} />
-        <Documents thingId={thing.id} documents={thing.attachments ?? []} />
-        <Links thingId={thing.id} links={thing.links ?? []} />
+        <div className="flex min-w-0 flex-col gap-4 lg:col-start-2">
+          <Documents thingId={thing.id} documents={thing.attachments ?? []} />
+          <Links thingId={thing.id} links={thing.links ?? []} />
+        </div>
       </div>
 
       <ThingFormDialog open={editing} onOpenChange={setEditing} thing={thing} />
@@ -331,7 +338,7 @@ const ThingView = ({ thing }: { thing: ThingDetail }) => {
 };
 
 const Details = ({ rows }: { rows: [string, ReactNode][] }) => (
-  <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 text-sm">
+  <dl className="grid grid-cols-[minmax(0,8rem)_1fr] gap-x-4 gap-y-2.5 text-sm sm:grid-cols-[10rem_1fr]">
     {rows.map(([k, v]) => (
       <div key={k} className="contents">
         <dt className="text-fg-muted">{k}</dt>

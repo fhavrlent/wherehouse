@@ -509,7 +509,8 @@
     "saveTemplate": "Save as template",
     "templateSaved": "Saved as a template. Pick it when adding a thing.",
     "template": "Template",
-    "fromApp": "From {{app}}"
+    "fromApp": "From {{app}}",
+    "details": "Details"
   },
   "thingForm": {
     "editTitle": "Edit",

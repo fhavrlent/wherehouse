@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Download, FileText, Library, Loader2, Search, Trash2, Upload } from "lucide-react";
+import { ChevronDown, Download, FileText, Library, Loader2, Search, Trash2, Upload } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -8,7 +8,7 @@ import { useInvalidate, useSettingsQuery } from "@/lib/queries";
 import { Button } from "./ui/button";
 import { Dialog } from "./ui/dialog";
 import { Input, Select } from "./ui/input";
-import { Card } from "./ui/misc";
+import { Card, CardHeader } from "./ui/misc";
 
 /** A thing's documents: manuals, receipts and so on, stored here or linked from Paperless. */
 export const Documents = ({ thingId, documents }: { thingId: number; documents: Attachment[] }) => {
@@ -44,61 +44,63 @@ export const Documents = ({ thingId, documents }: { thingId: number; documents: 
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
-        <h2 className="text-sm font-semibold">{t("documents.title")}</h2>
-        <div className="flex gap-1">
-          {settings?.paperlessEnabled && (
-            <Button variant="ghost" size="sm" onClick={() => setLinking(true)}>
-              <Library /> {t("documents.fromPaperless")}
-            </Button>
-          )}
-          <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-fg-muted hover:bg-surface-3 hover:text-fg">
-            {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-            {t("documents.upload")}
-            <input
-              type="file"
-              multiple
-              className="sr-only"
-              onChange={(e) => {
-                void upload(e.target.files);
-                e.target.value = "";
-              }}
-            />
-          </label>
-        </div>
-      </div>
+      <CardHeader title={t("documents.title")}>
+        {settings?.paperlessEnabled && (
+          <Button variant="ghost" size="sm" onClick={() => setLinking(true)}>
+            <Library /> {t("documents.fromPaperless")}
+          </Button>
+        )}
+        <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-fg-muted hover:bg-surface-3 hover:text-fg">
+          {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+          {t("documents.upload")}
+          <input
+            type="file"
+            multiple
+            className="sr-only"
+            onChange={(e) => {
+              void upload(e.target.files);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      </CardHeader>
       {documents.length === 0 ? (
         <p className="px-4 py-4 text-sm text-fg-subtle">{t("documents.none")}</p>
       ) : (
         <ul className="divide-y divide-border">
           {documents.map((d) => (
-            <li key={d.id} className="flex items-center gap-3 px-4 py-2">
-              <FileText className="size-4 shrink-0 text-fg-subtle" />
-              <a
-                href={attachmentUrl(d)}
-                target="_blank"
-                rel="noreferrer"
-                className="min-w-0 flex-1 truncate text-sm hover:text-primary"
-              >
-                {d.filename}
-              </a>
-              {d.storage === "paperless" && (
-                <span className="hidden rounded bg-surface-3 px-1.5 py-0.5 text-[11px] text-fg-muted sm:inline">
-                  Paperless
-                </span>
-              )}
-              <Select
-                value={d.kind}
-                onChange={(e) => run(() => api.updateAttachment(d.id, e.target.value as AttachmentKind, d.filename))}
-                className="h-7 w-32 text-xs"
-                aria-label={t("documents.kind")}
-              >
-                {ATTACHMENT_KINDS.map((k) => (
-                  <option key={k} value={k}>
-                    {t(`documentKinds.${k}`)}
-                  </option>
-                ))}
-              </Select>
+            <li key={d.id} className="flex items-start gap-3 py-2.5 pr-2 pl-4">
+              <FileText className="mt-0.5 size-4 shrink-0 text-fg-subtle" />
+              <div className="min-w-0 flex-1">
+                <a
+                  href={attachmentUrl(d)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="line-clamp-2 text-sm break-words hover:text-primary"
+                >
+                  {d.filename}
+                </a>
+                <div className="mt-0.5 flex items-center gap-1.5 text-xs text-fg-subtle">
+                  <label className="relative -ml-1 inline-flex items-center rounded text-fg-muted focus-within:ring-2 focus-within:ring-ring hover:bg-surface-3 hover:text-fg">
+                    <select
+                      value={d.kind}
+                      onChange={(e) =>
+                        run(() => api.updateAttachment(d.id, e.target.value as AttachmentKind, d.filename))
+                      }
+                      className="[field-sizing:content] cursor-pointer appearance-none bg-transparent py-0.5 pr-4 pl-1 text-xs outline-none"
+                      aria-label={t("documents.kind")}
+                    >
+                      {ATTACHMENT_KINDS.map((k) => (
+                        <option key={k} value={k}>
+                          {t(`documentKinds.${k}`)}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-0.5 size-3" />
+                  </label>
+                  {d.storage === "paperless" && <span>Paperless</span>}
+                </div>
+              </div>
               <a
                 href={attachmentUrl(d, true)}
                 aria-label={t("documents.download")}

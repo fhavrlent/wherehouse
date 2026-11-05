@@ -65,6 +65,14 @@ export const Card = ({ className, children }: { className?: string; children: Re
   <div className={cn("rounded-2xl border border-border bg-surface shadow-card", className)}>{children}</div>
 );
 
+/** The title row of a card, with what can be done there on the right. */
+export const CardHeader = ({ title, children }: { title: ReactNode; children?: ReactNode }) => (
+  <div className="flex min-h-12 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-border py-2 pr-2 pl-4">
+    <h2 className="text-sm font-semibold">{title}</h2>
+    {children != null && <div className="flex items-center gap-1">{children}</div>}
+  </div>
+);
+
 export const Kbd = ({ children }: { children: ReactNode }) => (
   <kbd className="hidden h-5 min-w-5 items-center justify-center rounded border border-border bg-surface-2 px-1 font-sans text-[11px] text-fg-subtle [@media(hover:hover)]:inline-flex">
     {children}

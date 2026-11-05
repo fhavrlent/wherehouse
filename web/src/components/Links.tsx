@@ -7,7 +7,7 @@ import { appName } from "@/lib/apps";
 import { useInvalidate } from "@/lib/queries";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Card } from "./ui/misc";
+import { Card, CardHeader } from "./ui/misc";
 
 /** Links from a thing elsewhere: its warranty, the shop's page, a video. */
 export const Links = ({ thingId, links }: { thingId: number; links: Link[] }) => {
@@ -29,12 +29,11 @@ export const Links = ({ thingId, links }: { thingId: number; links: Link[] }) =>
   };
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
-        <h2 className="text-sm font-semibold">{t("links.title")}</h2>
+      <CardHeader title={t("links.title")}>
         <Button variant="ghost" size="sm" onClick={() => setAdding(true)}>
           <Plus /> {t("links.add")}
         </Button>
-      </div>
+      </CardHeader>
       {links.length === 0 && !adding && <p className="px-4 py-4 text-sm text-fg-subtle">{t("links.none")}</p>}
       {links.length > 0 && (
         <ul className="divide-y divide-border">

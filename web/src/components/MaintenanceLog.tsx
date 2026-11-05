@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { Dialog } from "./ui/dialog";
 import { Field, Input, Textarea } from "./ui/input";
-import { Card } from "./ui/misc";
+import { Card, CardHeader } from "./ui/misc";
 
 /** A thing's maintenance log: what is due first, then what was done. */
 export const MaintenanceLog = ({ thingId, entries }: { thingId: number; entries: Maintenance[] }) => {
@@ -30,12 +30,11 @@ export const MaintenanceLog = ({ thingId, entries }: { thingId: number; entries:
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
-        <h2 className="text-sm font-semibold">{t("maintenance.title")}</h2>
+      <CardHeader title={t("maintenance.title")}>
         <Button variant="ghost" size="sm" onClick={() => setEditing("new")}>
           <Plus /> {t("maintenance.add")}
         </Button>
-      </div>
+      </CardHeader>
       {entries.length === 0 ? (
         <p className="px-4 py-4 text-sm text-fg-subtle">{t("maintenance.none")}</p>
       ) : (
