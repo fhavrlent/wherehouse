@@ -190,30 +190,28 @@ func (s *Server) connectToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !g.multiple {
-		t, err := s.appToken(r, g, g.household)
+		made, err := s.store.CreateAppTokens(r.Context(), g.user, g.app, g.host(), []int64{g.household}, false)
 		if err != nil {
 			fail(w, err)
 			return
 		}
-		writeJSON(w, 200, t)
+		if len(made) == 0 {
+			fail(w, store.ErrNotFound)
+			return
+		}
+		writeJSON(w, 200, connectedToken{Token: made[0].Token, Household: householdBrief{ID: made[0].Household, Name: made[0].HouseholdName}})
 		return
 	}
-	tokens := []connectedToken{}
-	for _, hh := range g.households {
-		// Someone who left a household since allowing gets no token for it.
-		if _, err := s.store.Role(r.Context(), hh, g.user); err == store.ErrNotFound {
-			continue
-		}
-		if err := s.store.DeleteAppTokens(r.Context(), g.user, hh, g.app, g.host()); err != nil {
-			fail(w, err)
-			return
-		}
-		t, err := s.appToken(r, g, hh)
-		if err != nil {
-			fail(w, err)
-			return
-		}
-		tokens = append(tokens, t)
+	// All households' tokens or none, so a failure leaves no token the app
+	// never got.
+	made, err := s.store.CreateAppTokens(r.Context(), g.user, g.app, g.host(), g.households, true)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	tokens := make([]connectedToken, 0, len(made))
+	for _, m := range made {
+		tokens = append(tokens, connectedToken{Token: m.Token, Household: householdBrief{ID: m.Household, Name: m.HouseholdName}})
 	}
 	writeJSON(w, 200, map[string]any{"tokens": tokens})
 }
@@ -226,22 +224,6 @@ type connectedToken struct {
 type householdBrief struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
-}
-
-// appToken makes the app's token for one household of the grant.
-func (s *Server) appToken(r *http.Request, g connectGrant, hh int64) (connectedToken, error) {
-	h, err := s.store.GetHousehold(r.Context(), hh)
-	if err != nil {
-		return connectedToken{}, err
-	}
-	raw, tok, err := s.store.CreateToken(r.Context(), g.user, hh, g.app)
-	if err != nil {
-		return connectedToken{}, err
-	}
-	if err := s.store.SetTokenAppHost(r.Context(), tok.ID, g.host()); err != nil {
-		return connectedToken{}, err
-	}
-	return connectedToken{Token: raw, Household: householdBrief{ID: h.ID, Name: h.Name}}, nil
 }
 
 type connectHousehold struct {

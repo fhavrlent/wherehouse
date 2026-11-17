@@ -48,8 +48,9 @@ export const Connect = () => {
   const open = (many.data ?? []).filter((h) => !h.connected);
   // Until the person ticks something: the household asked for, else the
   // current one, if the app isn't connected to it yet.
+  // A household connected meanwhile, e.g. in another tab, drops out.
   const picked =
-    ticked ??
+    ticked?.filter((id) => open.some((h) => h.id === id)) ??
     open.filter((h) => h.id === (open.some((o) => o.id === preselect) ? preselect : data?.current)).map((h) => h.id);
   const toggle = (id: number) => setTicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]);
   const allow = async () => {

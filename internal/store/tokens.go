@@ -40,30 +40,90 @@ func (s *Store) CreateToken(ctx context.Context, userID, hh int64, name string) 
 	case utf8.RuneCountInString(name) > MaxTagName:
 		return "", nil, invalid("nameLong", i18n.Args{"max": MaxTagName})
 	}
-	b := make([]byte, 24)
-	rand.Read(b)
-	raw := TokenPrefix + hex.EncodeToString(b)
-	t := &Token{Household: hh, Name: name, CreatedAt: now()}
-	err := s.withTx(ctx, func(tx *sql.Tx) error {
-		var count int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM api_tokens WHERE user_id = ?`, userID).Scan(&count); err != nil {
-			return err
-		}
-		if count >= MaxTokens {
-			return invalid("tooManyTokens", i18n.Args{"max": MaxTokens})
-		}
-		res, err := tx.ExecContext(ctx, `INSERT INTO api_tokens (user_id, household_id, name, token_hash, created_at) VALUES (?, ?, ?, ?, ?)`,
-			userID, hh, name, hashToken(raw), t.CreatedAt)
-		if err != nil {
-			return err
-		}
-		t.ID, err = res.LastInsertId()
+	var raw string
+	var t *Token
+	err := s.withTx(ctx, func(tx *sql.Tx) (err error) {
+		raw, t, err = createToken(ctx, tx, userID, hh, name)
 		return err
 	})
 	if err != nil {
 		return "", nil, err
 	}
 	return raw, t, nil
+}
+
+func createToken(ctx context.Context, tx *sql.Tx, userID, hh int64, name string) (string, *Token, error) {
+	b := make([]byte, 24)
+	rand.Read(b)
+	raw := TokenPrefix + hex.EncodeToString(b)
+	t := &Token{Household: hh, Name: name, CreatedAt: now()}
+	var count int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM api_tokens WHERE user_id = ?`, userID).Scan(&count); err != nil {
+		return "", nil, err
+	}
+	if count >= MaxTokens {
+		return "", nil, invalid("tooManyTokens", i18n.Args{"max": MaxTokens})
+	}
+	res, err := tx.ExecContext(ctx, `INSERT INTO api_tokens (user_id, household_id, name, token_hash, created_at) VALUES (?, ?, ?, ?, ?)`,
+		userID, hh, name, hashToken(raw), t.CreatedAt)
+	if err != nil {
+		return "", nil, err
+	}
+	t.ID, err = res.LastInsertId()
+	return raw, t, err
+}
+
+// AppToken is a token made for an app in one household.
+type AppToken struct {
+	Token         string
+	Household     int64
+	HouseholdName string
+}
+
+// CreateAppTokens makes the app's tokens, at the host the person approved,
+// for each household they are still in, all or none. With replace, the
+// app's earlier tokens there are deleted first.
+func (s *Store) CreateAppTokens(ctx context.Context, uid int64, app, host string, households []int64, replace bool) ([]AppToken, error) {
+	app = strings.TrimSpace(app)
+	switch {
+	case app == "":
+		return nil, invalid("tokenName", nil)
+	case utf8.RuneCountInString(app) > MaxTagName:
+		return nil, invalid("nameLong", i18n.Args{"max": MaxTagName})
+	}
+	out := []AppToken{}
+	err := s.withTx(ctx, func(tx *sql.Tx) error {
+		for _, hh := range households {
+			var name string
+			err := tx.QueryRowContext(ctx, `SELECT h.name FROM households h JOIN household_members m ON m.household_id = h.id
+				WHERE h.id = ? AND m.user_id = ?`, hh, uid).Scan(&name)
+			if errors.Is(err, sql.ErrNoRows) {
+				continue // left it since allowing
+			}
+			if err != nil {
+				return err
+			}
+			if replace {
+				if _, err := tx.ExecContext(ctx, `DELETE FROM api_tokens WHERE user_id = ? AND household_id = ? AND name = ? AND app_host = ?`,
+					uid, hh, app, host); err != nil {
+					return err
+				}
+			}
+			raw, t, err := createToken(ctx, tx, uid, hh, app)
+			if err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `UPDATE api_tokens SET app_host = ? WHERE id = ?`, host, t.ID); err != nil {
+				return err
+			}
+			out = append(out, AppToken{Token: raw, Household: hh, HouseholdName: name})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (s *Store) ListTokens(ctx context.Context, userID int64) ([]Token, error) {
@@ -281,12 +341,6 @@ type Hook struct {
 	Secret  string
 }
 
-// SetTokenAppHost records the host a person approved for an app's token.
-func (s *Store) SetTokenAppHost(ctx context.Context, tokenID int64, host string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE api_tokens SET app_host = ? WHERE id = ?`, host, tokenID)
-	return err
-}
-
 // TokenAppHost returns the host approved for a token, "" for tokens people
 // made themselves.
 func (s *Store) TokenAppHost(ctx context.Context, tokenID int64) (string, error) {
@@ -342,17 +396,6 @@ func (s *Store) AppHouseholds(ctx context.Context, uid int64, app, host string) 
 		out[id] = true
 	}
 	return out, rows.Err()
-}
-
-// DeleteAppTokens deletes the person's tokens of the app at that host in a
-// household, so connecting it again replaces them.
-func (s *Store) DeleteAppTokens(ctx context.Context, uid, hh int64, app, host string) error {
-	if host == "" {
-		return nil
-	}
-	_, err := s.db.ExecContext(ctx, `DELETE FROM api_tokens WHERE user_id = ? AND household_id = ? AND name = ? AND app_host = ?`,
-		uid, hh, strings.TrimSpace(app), host)
-	return err
 }
 
 // UserHooks lists the hooks of a person's tokens, in households they are
