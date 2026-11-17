@@ -4,11 +4,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/fhavrlent/wherehouse/internal/config"
 )
 
 func TestHooks(t *testing.T) {
@@ -24,18 +25,15 @@ func TestHooks(t *testing.T) {
 	}))
 	defer app.Close()
 
-	e := newTestEnv(t)
+	// The test app is on the local network: the admin allowed its host.
+	e := newTestEnv(t, func(cfg *config.Config) { cfg.HookAllowedHosts = []string{"127.0.0.1"} })
 	c := e.signIn(t, "a")
 	h := e.h
 	hh := decodeAs[householdsResponse](t, mustCall(t, h, c, "GET", "/api/households", "", 200)).Current
 
 	// Connect an app whose callback is on the test server.
-	redirect := app.URL + "/wherehouse/callback"
-	res := decodeAs[map[string]string](t, mustCall(t, h, c, "POST", "/api/connect",
-		`{"app":"Warranteed","redirectUri":"`+redirect+`","state":"s","household":`+itoa(hh)+`}`, 200))
-	u, _ := url.Parse(res["redirect"])
-	rec := call(h, "POST", "/connect/token", `{"code":"`+u.Query().Get("code")+`","redirect_uri":"`+redirect+`"}`, nil)
-	token := decodeAs[struct{ Token string }](t, rec).Token
+	token := connectApp(t, h, c, hh, app.URL+"/wherehouse/callback")
+	var rec *httptest.ResponseRecorder
 	withToken := func(method, path, body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(method, "http://wherehouse.test"+path, strings.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -77,5 +75,33 @@ func TestHooks(t *testing.T) {
 	}
 	if !strings.Contains(pings[0], `"event":"changed"`) || sigs[0] != Sign(secret, []byte(pings[0])) {
 		t.Errorf("ping %q signed %q", pings[0], sigs[0])
+	}
+}
+
+// A connected app on the local network isn't pinged unless the admin
+// allowed its host: connecting can't make the server post into its network.
+func TestHooksOnlyToAllowedLocalHosts(t *testing.T) {
+	var mu sync.Mutex
+	pings := 0
+	app := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		pings++
+		mu.Unlock()
+	}))
+	defer app.Close()
+
+	e := newTestEnv(t)
+	c := e.signIn(t, "a")
+	hh := decodeAs[householdsResponse](t, mustCall(t, e.h, c, "GET", "/api/households", "", 200)).Current
+	token := connectApp(t, e.h, c, hh, app.URL+"/wherehouse/callback")
+	if rec := callWithToken(e.h, "PUT", "/api/hook", `{"url":"`+app.URL+`/hooks/wherehouse"}`, token); rec.Code != 200 {
+		t.Fatalf("set hook = %d %s", rec.Code, rec.Body)
+	}
+	add(t, e.h, c, `{"name":"One"}`)
+	time.Sleep(hookDelay + time.Second)
+	mu.Lock()
+	defer mu.Unlock()
+	if pings != 0 {
+		t.Errorf("pinged %d times", pings)
 	}
 }

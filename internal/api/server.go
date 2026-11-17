@@ -43,7 +43,7 @@ type Server struct {
 
 func New(cfg *config.Config, st *store.Store, a *auth.Auth, files *Files, assets fs.FS, version string) *Server {
 	return &Server{cfg: cfg, store: st, auth: a, files: files, assets: assets, version: version,
-		thumbSlots: make(chan struct{}, 2), hooks: newHooks(st)}
+		thumbSlots: make(chan struct{}, 2), hooks: newHooks(st, cfg.HookAllowedHosts)}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -90,6 +90,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("POST /api/things", s.createThing)
 	api.HandleFunc("GET /api/things/{id}", s.getThing)
 	api.HandleFunc("PUT /api/things/{id}", s.updateThing)
+	api.HandleFunc("PATCH /api/things/{id}", s.patchThing)
 	api.HandleFunc("DELETE /api/things/{id}", s.deleteThing)
 	api.HandleFunc("POST /api/things/{id}/archive", s.archiveThing(true))
 	api.HandleFunc("POST /api/things/{id}/unarchive", s.archiveThing(false))
@@ -118,6 +119,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("POST /api/connect", s.allowConnect)
 	api.HandleFunc("PUT /api/hook", s.setHook)
 	api.HandleFunc("DELETE /api/hook", s.removeHook)
+	api.HandleFunc("DELETE /api/token", s.revokeOwnToken)
 	api.HandleFunc("GET /api/tokens", sessionOnly(s.listTokens))
 	api.HandleFunc("POST /api/tokens", sessionOnly(s.createToken))
 	api.HandleFunc("DELETE /api/tokens/{id}", sessionOnly(s.deleteToken))
@@ -156,7 +158,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /api/import/homebox", s.importStatus)
 
 	mux.HandleFunc("POST /connect/token", s.connectToken)
-	mux.Handle("/api/", s.auth.Middleware(s.inHousehold(s.pingOnChange(api))))
+	mux.Handle("/api/", s.auth.Middleware(s.inHousehold(s.pingOnChange(appScope(api)))))
 	mux.Handle("/", s.spa())
 
 	return recoverer(logRequests(securityHeaders(sameOrigin(s.cfg, mux))))
@@ -342,6 +344,8 @@ func fail(w http.ResponseWriter, err error) {
 		writeMsg(w, http.StatusBadRequest, ve.Key, ve.Args)
 	case errors.Is(err, store.ErrNotFound):
 		writeMsg(w, http.StatusNotFound, "server.notFound", nil)
+	case errors.Is(err, store.ErrAppLinkTaken):
+		writeMsg(w, http.StatusConflict, "server.appLinkTaken", nil)
 	default:
 		slog.Error("request error", "err", err)
 		writeMsg(w, http.StatusInternalServerError, "server.internal", nil)

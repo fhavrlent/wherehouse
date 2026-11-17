@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"path/filepath"
@@ -154,6 +155,25 @@ func (s *Server) updateThing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t, err := s.store.UpdateThing(r.Context(), household(r), id, in)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, 200, t)
+}
+
+// patchThing changes only the details sent, e.g. {"quantity": 2}; see
+// store.PatchThing.
+func (s *Server) patchThing(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var patch json.RawMessage
+	if !decode(w, r, &patch) {
+		return
+	}
+	t, err := s.store.PatchThing(r.Context(), household(r), id, patch)
 	if err != nil {
 		fail(w, err)
 		return

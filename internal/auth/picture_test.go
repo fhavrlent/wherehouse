@@ -54,11 +54,4 @@ func TestFetchPicture(t *testing.T) {
 	if _, _, err := fetchPicture(context.Background(), "idp.example.com", srv.URL+"/png"); err == nil {
 		t.Error("local address from an untrusted host: expected an error")
 	}
-	for addr, ok := range map[string]bool{"1.1.1.1:443": true, "[2606:4700::1111]:443": true, "10.0.0.1:80": false,
-		"192.168.1.5:80": false, "127.0.0.1:80": false, "169.254.169.254:80": false, "100.100.1.1:80": false,
-		"[::1]:80": false, "[fd00::1]:80": false, "[::ffff:10.0.0.1]:80": false, "0.0.0.0:80": false} {
-		if err := publicOnly("tcp", addr, nil); (err == nil) != ok {
-			t.Errorf("publicOnly(%s) = %v", addr, err)
-		}
-	}
 }

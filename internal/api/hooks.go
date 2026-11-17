@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/fhavrlent/wherehouse/internal/auth"
+	"github.com/fhavrlent/wherehouse/internal/netguard"
 	"github.com/fhavrlent/wherehouse/internal/store"
 )
 
@@ -24,6 +25,11 @@ import (
 // goes only to the host the person approved when connecting, is signed with
 // the hook's secret (X-Wherehouse-Signature: sha256=<HMAC of the body>), and
 // isn't retried: a missed ping is caught by the app's next regular read.
+//
+// Anyone in a household can connect an app, so pings go only to public
+// addresses, or to hosts the admin allowed on the local network
+// (WHEREHOUSE_HOOK_ALLOWED_HOSTS): connecting can't make the server post
+// into its own network.
 
 // hookDelay gathers the changes of a moment into one ping.
 const hookDelay = 3 * time.Second
@@ -37,12 +43,12 @@ type hooks struct {
 	pending map[int64]bool
 }
 
-func newHooks(st *store.Store) *hooks {
-	return &hooks{store: st, pending: map[int64]bool{},
-		client: &http.Client{Timeout: 10 * time.Second,
-			// The approved host is the only one pinged; a redirect elsewhere
-			// isn't followed.
-			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+func newHooks(st *store.Store, allowed []string) *hooks {
+	client := netguard.Client(10*time.Second, allowed...)
+	// The approved host is the only one pinged; a redirect elsewhere isn't
+	// followed.
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	return &hooks{store: st, pending: map[int64]bool{}, client: client}
 }
 
 // changed pings the household's apps, except the one that made the change.
@@ -84,7 +90,7 @@ func (h *hooks) send(hook store.Hook, hh int64) {
 	req.Header.Set("X-Wherehouse-Signature", Sign(hook.Secret, body))
 	res, err := h.client.Do(req)
 	if err != nil {
-		slog.Debug("hook not delivered", "token", hook.TokenID, "err", err)
+		slog.Warn("hook not delivered", "token", hook.TokenID, "err", err)
 		return
 	}
 	res.Body.Close()

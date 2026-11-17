@@ -138,7 +138,7 @@ func (s *Store) AttachLabel(ctx context.Context, hh, thing int64, code string) (
 					return err
 				}
 				if n, _ := res.RowsAffected(); n == 1 {
-					return s.reindex(ctx, tx, hh, thing)
+					return s.relabelled(ctx, tx, hh, thing)
 				}
 			}
 		}
@@ -164,7 +164,7 @@ func (s *Store) AttachLabel(ctx context.Context, hh, thing int64, code string) (
 		if _, err := tx.ExecContext(ctx, `UPDATE labels SET thing_id = ? WHERE code = ?`, thing, code); err != nil {
 			return err
 		}
-		return s.reindex(ctx, tx, hh, thing)
+		return s.relabelled(ctx, tx, hh, thing)
 	})
 	return code, err
 }
@@ -182,6 +182,15 @@ func (s *Store) DetachLabel(ctx context.Context, hh int64, code string) error {
 		if l.ThingID == nil {
 			return nil
 		}
-		return s.reindex(ctx, tx, hh, *l.ThingID)
+		return s.relabelled(ctx, tx, hh, *l.ThingID)
 	})
+}
+
+// relabelled notes that a thing's label changed: it is found by the new
+// code, and apps reading the change feed see the change.
+func (s *Store) relabelled(ctx context.Context, tx *sql.Tx, hh, thing int64) error {
+	if err := touch(ctx, tx, thing); err != nil {
+		return err
+	}
+	return s.reindex(ctx, tx, hh, thing)
 }

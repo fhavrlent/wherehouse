@@ -6,66 +6,17 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
-	"net/netip"
 	"net/url"
-	"strings"
-	"syscall"
 	"time"
+
+	"github.com/fhavrlent/wherehouse/internal/netguard"
 )
 
 const maxPictureSize = 2 << 20
 
 // Raster formats only: an SVG could carry scripts.
 var pictureTypes = map[string]bool{"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true}
-
-// pictureClient fetches pictures from public addresses, and from the
-// identity provider's own host (trusted), which is often on the local
-// network. Any other address on it, or on the server itself, is refused: the
-// picture claim may be a URL the user typed in at the provider. The check is
-// made when connecting, so redirects and names that resolve inside are
-// refused too.
-func pictureClient(trusted string) *http.Client {
-	dialer := &net.Dialer{Timeout: 5 * time.Second}
-	return &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				host, _, err := net.SplitHostPort(addr)
-				if err != nil {
-					return nil, err
-				}
-				d := *dialer
-				if trusted == "" || !strings.EqualFold(host, trusted) {
-					d.Control = publicOnly
-				}
-				return d.DialContext(ctx, network, addr)
-			},
-		},
-	}
-}
-
-// sharedAddressSpace is carrier-grade NAT, also used by VPNs such as
-// Tailscale: not public either.
-var sharedAddressSpace = netip.MustParsePrefix("100.64.0.0/10")
-
-func publicOnly(_, address string, _ syscall.RawConn) error {
-	host, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return err
-	}
-	ip, err := netip.ParseAddr(host)
-	if err != nil {
-		return err
-	}
-	ip = ip.Unmap()
-	if !ip.IsGlobalUnicast() || ip.IsPrivate() || sharedAddressSpace.Contains(ip) {
-		return fmt.Errorf("%s isn't a public address", ip)
-	}
-	return nil
-}
 
 // savePicture downloads the profile picture named by the provider's
 // "picture" claim and stores it, so the app can serve it from its own origin.
@@ -100,7 +51,10 @@ func fetchPicture(ctx context.Context, trusted, raw string) ([]byte, string, err
 	if err != nil {
 		return nil, "", err
 	}
-	res, err := pictureClient(trusted).Do(req)
+	// The picture claim may be a URL the user typed in at the provider: only
+	// public addresses, and the provider's own host, which is often on the
+	// local network.
+	res, err := netguard.Client(5*time.Second, trusted).Do(req)
 	if err != nil {
 		return nil, "", err
 	}

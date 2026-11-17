@@ -15,25 +15,44 @@ accepting invites answer 403 to a token. Delete it in Settings to stop it
 working; it also stops when its owner leaves that household, or is removed
 from the allowed groups at the identity provider (checked hourly).
 
+A token from connecting an app can do less: what this page lists for keeping
+things in step (reading and adding things, `PATCH` but not `PUT`, photos,
+documents, links, maintenance, the change feed and the hook), and nothing that
+takes the whole household out or changes how it is set up, such as the
+exports, kinds, fields, labels or invites. Anything else answers 403
+(`server.appNotAllowed`). A token made by hand can do all of it.
+
 Errors come as `{"error": "English text", "code": "server.…", "params": {…}}`
 with a 4xx or 5xx status.
 
 ## Connecting an app
 
-1. Send the person to `<Wherehouse>/connect?app=<your app's name>&redirect_uri=<your callback>&state=<random>`.
+1. Make a random `code_verifier` (43 to 128 of `A–Z a–z 0–9 - . _ ~`) and keep
+   it with your `state`. Send the person to
+   `<Wherehouse>/connect?app=<your app's name>&redirect_uri=<your callback>&state=<random>&code_challenge=<challenge>&code_challenge_method=S256`,
+   where the challenge is the SHA-256 of the verifier in base64url without
+   padding ([PKCE](https://www.rfc-editor.org/rfc/rfc7636)).
 2. Signed in, they pick a household and allow it. Their browser comes back to
    `redirect_uri` with `code` and your `state` (or `error=access_denied`).
-3. From your server, `POST /connect/token` with `{"code": "…", "redirect_uri": "<the same>"}`.
+3. From your server, `POST /connect/token` with
+   `{"code": "…", "redirect_uri": "<the same>", "code_verifier": "…"}`.
    The answer is `{"token": "wherehouse_…", "household": {"id", "name"}}`.
 
-A code works once, for 5 minutes, and only with the same `redirect_uri`.
+A code works once, for 5 minutes, only with the same `redirect_uri` and only
+with the verifier, so a code seen by someone else, e.g. in a log, is no use to
+them.
+
+When the person disconnects your app, `DELETE /api/token` with its token ends
+it.
 
 ### Being told about changes
 
 With a token from connecting, `PUT /api/hook` with `{"url": "…"}` asks
 Wherehouse to ping that address when something in the household changes;
 the answer is `{"secret": "…"}`. The address must be on the host of the
-`redirect_uri` the person approved. A ping is a `POST` with
+`redirect_uri` the person approved, and is pinged only if it is a public
+address, or a host the admin allowed in `WHEREHOUSE_HOOK_ALLOWED_HOSTS` (for an
+app on the local network). A ping is a `POST` with
 `{"event": "changed", "household": <id>, "at": "<time>"}`, signed in
 `X-Wherehouse-Signature: sha256=<hex HMAC-SHA256 of the body with the secret>`.
 It carries no data: read the change feed when it comes. Changes made with your
@@ -55,7 +74,8 @@ things of a place kind, and things holding something, are shown as places.
 | `GET /api/search?q=…` | Things matching every word of `q` in their name, details, tags, custom fields, label code, kind or what they are in. `archived=1` searches archived things. |
 | `GET /api/things/{id}` | One thing with `photos`, `fields`, `attachments`, `maintenance`, `links` and `contents` (what is directly inside). |
 | `POST /api/things` | Add a thing. Only `name` is needed; see the fields below. |
-| `PUT /api/things/{id}` | Change it. Send every field you don't mean to clear; `tags` and `fields` left out stay as they are, a field set to `""` is cleared. Read it first and send it back changed. |
+| `PATCH /api/things/{id}` | Change only the fields sent, e.g. `{"quantity": 2}`; everything else stays as it is at that moment. Use this from an app: a move or a sale made meanwhile isn't written back over. |
+| `PUT /api/things/{id}` | Change it. Send every field you don't mean to clear; `tags` and `fields` left out stay as they are, a field set to `""` is cleared. Read it first and send it back changed. Not for tokens from connecting an app. |
 | `POST /api/move` | Move things, with what is inside them: `{into, things: [ids]}`; `into` null is into nothing. |
 | `POST /api/things/{id}/copy` | Copy a thing: `{sameParent: true}` beside itself, or `{parentId}` elsewhere; `{template: true}` makes a template; `photos: true` copies photos too. |
 | `POST /api/things/{id}/archive`, `…/unarchive` | Archive a thing or bring it back. |
@@ -90,10 +110,10 @@ over the thing's purchase and warranty details.
 
 | | |
 | --- | --- |
-| `PUT /api/things/{id}/apps/{source}` | Link the thing: `{externalId, url, title, data, purchase}`. `source` is your app's name in lowercase, e.g. `warranteed`; `data` is up to 4 KB of JSON for yourself. With `purchase` (the purchase and warranty fields), your app owns them: Wherehouse shows them read-only and keeps them when the thing is edited here, while insurance and a sale stay Wherehouse's. Linking the same `externalId` to another thing moves the link. |
+| `PUT /api/things/{id}/apps/{source}` | Link the thing: `{externalId, url, title, data, purchase}`. `source` is your app's name in lowercase, e.g. `warranteed`; `data` is up to 4 KB of JSON for yourself. With `purchase` (the purchase and warranty fields), your app owns them: Wherehouse shows them read-only and keeps them when the thing is edited here, while insurance and a sale stay Wherehouse's. A thing already linked to another `externalId` of yours answers 409 (`server.appLinkTaken`): unlink it first. Linking the same `externalId` to another thing moves the link, and the purchase details of the thing it was on become Wherehouse's again. |
 | `DELETE /api/things/{id}/apps/{source}` | Unlink it. Purchase details you owned stay and become Wherehouse's. |
 | `GET /api/apps/{source}/{externalId}` | The thing linked to something of yours. |
-| `GET /api/changes?since=<RFC 3339>` | Things changed since then, and IDs of those deleted; ask again from `until`. About 1000 things come at once: with `more: true` there are more, so ask again from `until` straight away. Use it to notice things sold, archived or moved. |
+| `GET /api/changes?since=<RFC 3339>` | Things changed since then, and IDs of those deleted; ask again from `until`. About 1000 things come at once: with `more: true` there are more, so ask again from `until` straight away. Use it to notice things sold, archived or moved. A thing whose label changed, or whose path changed because what it is in was moved or renamed, comes too. |
 
 ## Maintenance
 

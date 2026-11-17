@@ -72,6 +72,8 @@ Discord, Telegram, Slack, Pushover, Pushbullet, IFTTT and Join work for everyone
 
 Apps such as Warranteed use Wherehouse with an API token from **Settings → API tokens**. [docs/api.md](docs/api.md) describes the API.
 
+A connected app on the local network, such as Warranteed beside Wherehouse, is told about changes only if its host is in `WHEREHOUSE_HOOK_ALLOWED_HOSTS`; without it, the app still finds changes when it next looks, only later.
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -95,6 +97,7 @@ Apps such as Warranteed use Wherehouse with an API token from **Settings → API
 | `TZ` | | Timezone |
 | `WHEREHOUSE_NOTIFY_HOUR` | `9` | Hour (0–23) after which reminders are sent |
 | `WHEREHOUSE_NOTIFY_ALLOWED_HOSTS` | | Comma-separated hosts non-admins may use with self-hosted notification services |
+| `WHEREHOUSE_HOOK_ALLOWED_HOSTS` | | Comma-separated hosts of connected apps on the local network (e.g. `warranteed`) that may be told about changes; others are told only on public addresses |
 | `WHEREHOUSE_SECRET` | | Key for encrypting stored refresh tokens and Paperless tokens; generated in the data directory if unset |
 | `WHEREHOUSE_MAX_UPLOAD_MB` | `50` | Maximum upload size |
 | `WHEREHOUSE_SESSION_DAYS` | `30` | Session length |
