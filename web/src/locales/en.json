@@ -621,7 +621,7 @@
     "connected": "Connected",
     "members_one": "Only you",
     "members_other": "{{count}} people",
-    "allConnected": "{{app}} is connected to all your households already.",
+    "allConnected": "{{app}} is connected to all your households already. Tick one to connect it again, e.g. if {{app}} lost its connection.",
     "reconnect": "Connected; allowing connects it again"
   },
   "document": {

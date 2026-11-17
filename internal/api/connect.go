@@ -32,8 +32,9 @@ import (
 // With &multiple=1 the person ticks one or more households, and step 3
 // answers with a token for each: {tokens: [{household, token}]}. Connecting
 // a household the app at that host is already connected to, either way,
-// replaces its old token; the page lets the person tick such a household
-// only when the app names it in &household=, to reconnect it. An app token lists the person's households, and which of them the
+// replaces its old token, e.g. when the app lost it; the page shows such
+// households as connected, ticked to begin with only when the app names one
+// in &household=. An app token lists the person's households, and which of them the
 // app is connected to, at GET /api/connect/households.
 //
 // A code works once, for connectCodeTTL, only with the same redirect_uri,

@@ -27,6 +27,8 @@ export const Connect = () => {
   const { data } = useHouseholds();
   const [household, setHousehold] = useState(0);
   const [ticked, setTicked] = useState<number[] | null>(null);
+  // Connected households the person ticked to connect again.
+  const [again, setAgain] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const many = useQuery({
     queryKey: ["connect", app, redirect],
@@ -45,16 +47,28 @@ export const Connect = () => {
     );
   }
   const chosen = household || preselect || (data?.current ?? 0);
-  // A connected household can be ticked only when the app names it, to
-  // reconnect it after losing its token; allowing replaces the old token.
-  const open = (many.data ?? []).filter((h) => !h.connected || h.id === preselect);
-  // Until the person ticks something: the household asked for, else the
-  // current one, if the app isn't connected to it yet.
-  // A household connected meanwhile, e.g. in another tab, drops out.
-  const picked =
-    ticked?.filter((id) => open.some((h) => h.id === id)) ??
-    open.filter((h) => h.id === (open.some((o) => o.id === preselect) ? preselect : data?.current)).map((h) => h.id);
-  const toggle = (id: number) => setTicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]);
+  const all = many.data ?? [];
+  const connected = (id: number) => all.some((h) => h.id === id && h.connected);
+  // Ticking a connected household connects it again, replacing the app's
+  // old token, e.g. when the app lost it. One the person ticked before it
+  // got connected elsewhere, e.g. in another tab, drops out instead, so
+  // that working token isn't replaced.
+  const keep = (id: number) => !connected(id) || again.includes(id) || id === preselect;
+  // Until the person ticks something: the household the app asked for,
+  // else the current one if the app isn't connected to it yet.
+  const start = all.some((h) => h.id === preselect)
+    ? [preselect]
+    : all.filter((h) => h.id === data?.current).map((h) => h.id);
+  const picked = (ticked ?? start).filter(keep);
+  const toggle = (id: number) => {
+    if (picked.includes(id)) {
+      setTicked(picked.filter((x) => x !== id));
+      setAgain(again.filter((x) => x !== id));
+    } else {
+      setTicked([...picked, id]);
+      if (connected(id)) setAgain([...again, id]);
+    }
+  };
   const allow = async () => {
     setBusy(true);
     try {
@@ -89,16 +103,12 @@ export const Connect = () => {
             {many.data.map((h) => (
               <label
                 key={h.id}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 text-sm",
-                  open.some((o) => o.id === h.id) ? "cursor-pointer hover:bg-surface-2" : "text-fg-muted",
-                )}
+                className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm hover:bg-surface-2"
               >
                 <input
                   type="checkbox"
                   className="size-4 accent-primary"
-                  checked={picked.includes(h.id) || (h.connected && h.id !== preselect)}
-                  disabled={!open.some((o) => o.id === h.id)}
+                  checked={picked.includes(h.id)}
                   onChange={() => toggle(h.id)}
                 />
                 <span className="min-w-0 flex-1">
@@ -106,14 +116,16 @@ export const Connect = () => {
                   <span className="block text-xs text-fg-subtle">{t("connect.members", { count: h.members })}</span>
                 </span>
                 {h.connected && (
-                  <span className="text-right text-xs">
-                    {t(h.id === preselect ? "connect.reconnect" : "connect.connected")}
+                  <span className={cn("text-right text-xs", !picked.includes(h.id) && "text-fg-muted")}>
+                    {t(picked.includes(h.id) ? "connect.reconnect" : "connect.connected")}
                   </span>
                 )}
               </label>
             ))}
           </div>
-          {open.length === 0 && <p className="text-xs text-fg-subtle">{t("connect.allConnected", { app })}</p>}
+          {all.every((h) => h.connected) && (
+            <p className="text-xs text-fg-subtle">{t("connect.allConnected", { app })}</p>
+          )}
         </fieldset>
       )}
       {!multiple && data && data.households.length > 1 && (

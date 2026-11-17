@@ -665,7 +665,7 @@
     "members_few": "{{count}} lidé",
     "members_many": "{{count}} lidí",
     "members_other": "{{count}} lidí",
-    "allConnected": "{{app}} už je připojená ke všem vašim domácnostem.",
+    "allConnected": "{{app}} už je připojená ke všem vašim domácnostem. Zaškrtněte některou, pokud ji chcete připojit znovu, třeba když {{app}} spojení ztratila.",
     "reconnect": "Připojeno; povolením se připojí znovu"
   },
   "document": {
