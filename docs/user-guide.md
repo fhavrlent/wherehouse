@@ -134,7 +134,7 @@ Under **Settings → Export**:
 
 ## Other apps
 
-Apps such as [Warranteed](https://github.com/fhavrlent/warranteed) connect through a page where you pick the household and click **Allow**; they then keep their details in step with Wherehouse. Each connected app has a token under **Settings → API tokens**, where deleting it disconnects the app. You can also make a token yourself there for your own scripts; [docs/api.md](api.md) describes the API.
+Apps such as [Warranteed](https://github.com/fhavrlent/warranteed) connect through a page where you pick the households to connect and click **Allow**; they then keep their details in step with Wherehouse. Each connected app has a token under **Settings → API tokens**, where deleting it disconnects the app. You can also make a token yourself there for your own scripts; [docs/api.md](api.md) describes the API.
 
 ## Settings
 

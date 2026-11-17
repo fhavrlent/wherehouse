@@ -542,11 +542,34 @@ export const api = {
   /** Allows another app; answers where to send the browser. */
   allowConnect: (app: string, redirectUri: string, state: string, codeChallenge: string, household: number) =>
     request<{ redirect: string }>("POST", "/api/connect", { app, redirectUri, state, codeChallenge, household }),
+  /** Allows an app for several households at once; it gets a token for each. */
+  allowConnectMany: (app: string, redirectUri: string, state: string, codeChallenge: string, households: number[]) =>
+    request<{ redirect: string }>("POST", "/api/connect", {
+      app,
+      redirectUri,
+      state,
+      codeChallenge,
+      multiple: true,
+      households,
+    }),
+  /** The person's households, and which of them the app at redirectUri's host is connected to. */
+  connectHouseholds: (app: string, redirectUri: string) =>
+    request<ConnectHousehold[]>(
+      "GET",
+      `/api/connect/households?app=${encodeURIComponent(app)}&redirect_uri=${encodeURIComponent(redirectUri)}`,
+    ),
   documentThings: (doc: number) => request<Thing[]>("GET", `/api/paperless/documents/${doc}/things`),
 
   importHomebox: (url: string, token: string) => request<ImportProgress>("POST", "/api/import/homebox", { url, token }),
   importStatus: () => request<ImportProgress | null>("GET", "/api/import/homebox"),
 };
+
+export interface ConnectHousehold {
+  id: number;
+  name: string;
+  members: number;
+  connected: boolean;
+}
 
 export const attachmentUrl = (a: Attachment, download = false) =>
   `/api/attachments/${a.id}/file${download ? "?download=1" : ""}`;

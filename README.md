@@ -99,7 +99,7 @@ Discord, Telegram, Slack, Pushover, Pushbullet, IFTTT and Join work for everyone
 
 ## Other apps
 
-Apps such as Warranteed connect from their own settings: Wherehouse asks which household to connect, and the app gets a token that can do only what keeping things in step needs. For your own scripts, make a token under **Settings → API tokens**. [docs/api.md](docs/api.md) describes the API.
+Apps such as Warranteed connect from their own settings: Wherehouse asks which households to connect, and the app gets a token for each that can do only what keeping things in step needs. For your own scripts, make a token under **Settings → API tokens**. [docs/api.md](docs/api.md) describes the API.
 
 A connected app on the local network, such as Warranteed beside Wherehouse, is told about changes only if its host is in `WHEREHOUSE_HOOK_ALLOWED_HOSTS`; without it, the app still finds changes when it next looks, only later. The [integration guide](docs/integrations.md#warranteed) has a Docker Compose example.
 

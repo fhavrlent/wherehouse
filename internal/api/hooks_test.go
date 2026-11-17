@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -103,5 +104,52 @@ func TestHooksOnlyToAllowedLocalHosts(t *testing.T) {
 	defer mu.Unlock()
 	if pings != 0 {
 		t.Errorf("pinged %d times", pings)
+	}
+}
+
+// Making or joining a household pings the person's connected apps, whatever
+// household they are connected to, so they can offer to connect it too.
+func TestHooksNewHousehold(t *testing.T) {
+	var mu sync.Mutex
+	var pings []map[string]any
+	app := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var p map[string]any
+		json.NewDecoder(r.Body).Decode(&p)
+		mu.Lock()
+		pings = append(pings, p)
+		mu.Unlock()
+	}))
+	defer app.Close()
+	e := newTestEnv(t, func(cfg *config.Config) { cfg.HookAllowedHosts = []string{"127.0.0.1"} })
+	a, b := e.signIn(t, "a"), e.signIn(t, "b")
+	home := decodeAs[householdsResponse](t, mustCall(t, e.h, a, "GET", "/api/households", "", 200)).Current
+	token := connectApp(t, e.h, a, home, app.URL+"/wherehouse/callback")
+	if rec := callWithToken(e.h, "PUT", "/api/hook", `{"url":"`+app.URL+`/hooks/wherehouse"}`, token); rec.Code != 200 {
+		t.Fatalf("hook = %d %s", rec.Code, rec.Body)
+	}
+	// Joining deletes an empty household of one's own, with its tokens.
+	add(t, e.h, a, `{"name":"Keeps home"}`)
+	// Someone else's household isn't announced to a's apps.
+	mustCall(t, e.h, b, "POST", "/api/households", `{"name":"B's","currency":"EUR"}`, 201)
+	cottage := decodeAs[struct{ ID int64 }](t, mustCall(t, e.h, a, "POST", "/api/households", `{"name":"Cottage","currency":"EUR"}`, 201)).ID
+	bHome := decodeAs[householdsResponse](t, mustCall(t, e.h, b, "GET", "/api/households", "", 200)).Current
+	invite := decodeAs[map[string]string](t, mustCall(t, e.h, b, "POST", "/api/household/invites", `{}`, 201))["url"]
+	code := invite[strings.LastIndex(invite, "/")+1:]
+	mustCall(t, e.h, a, "POST", "/api/invites/"+code+"/accept", "", 204)
+	mustCall(t, e.h, a, "POST", "/api/invites/"+code+"/accept", "", 204) // already in: no ping
+	time.Sleep(time.Second)
+
+	mu.Lock()
+	defer mu.Unlock()
+	var got []int64
+	for _, p := range pings {
+		if p["event"] != "households" {
+			t.Errorf("ping = %v", p)
+			continue
+		}
+		got = append(got, int64(p["household"].(float64)))
+	}
+	if len(got) != 2 || got[0] != cottage || got[1] != bHome {
+		t.Errorf("households announced = %v, want [%d %d]", got, cottage, bHome)
 	}
 }

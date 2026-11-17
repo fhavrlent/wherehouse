@@ -68,6 +68,7 @@ func (s *Server) restoreZip(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	go s.hooks.households(userID(r), res.HouseholdID)
 	writeJSON(w, http.StatusCreated, res)
 }
 

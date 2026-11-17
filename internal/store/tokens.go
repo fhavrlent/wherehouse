@@ -311,11 +311,65 @@ func (s *Store) SetHook(ctx context.Context, tokenID int64, url string) (string,
 	return secret, err
 }
 
+// TokenApp returns the app name and approved host of a token from
+// connecting; host is "" for tokens people made themselves.
+func (s *Store) TokenApp(ctx context.Context, tokenID int64) (app, host string, err error) {
+	err = s.db.QueryRowContext(ctx, `SELECT name, app_host FROM api_tokens WHERE id = ?`, tokenID).Scan(&app, &host)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", ErrNotFound
+	}
+	return app, host, err
+}
+
+// AppHouseholds returns the households in which the person has connected
+// the app at that host.
+func (s *Store) AppHouseholds(ctx context.Context, uid int64, app, host string) (map[int64]bool, error) {
+	out := map[int64]bool{}
+	if host == "" {
+		return out, nil
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT household_id FROM api_tokens WHERE user_id = ? AND name = ? AND app_host = ?`,
+		uid, strings.TrimSpace(app), host)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
+// DeleteAppTokens deletes the person's tokens of the app at that host in a
+// household, so connecting it again replaces them.
+func (s *Store) DeleteAppTokens(ctx context.Context, uid, hh int64, app, host string) error {
+	if host == "" {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx, `DELETE FROM api_tokens WHERE user_id = ? AND household_id = ? AND name = ? AND app_host = ?`,
+		uid, hh, strings.TrimSpace(app), host)
+	return err
+}
+
+// UserHooks lists the hooks of a person's tokens, in households they are
+// still in.
+func (s *Store) UserHooks(ctx context.Context, uid int64) ([]Hook, error) {
+	return s.hooks(ctx, `t.user_id = ?`, uid)
+}
+
 // Hooks lists the hooks of a household's tokens, of people still in it.
 func (s *Store) Hooks(ctx context.Context, hh int64) ([]Hook, error) {
+	return s.hooks(ctx, `t.household_id = ?`, hh)
+}
+
+func (s *Store) hooks(ctx context.Context, where string, arg int64) ([]Hook, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT t.id, t.hook_url, t.hook_secret FROM api_tokens t
 		JOIN household_members m ON m.household_id = t.household_id AND m.user_id = t.user_id
-		WHERE t.household_id = ? AND t.hook_url <> ''`, hh)
+		WHERE `+where+` AND t.hook_url <> ''`, arg)
 	if err != nil {
 		return nil, err
 	}
