@@ -14,7 +14,7 @@ Wherehouse is a sibling of [Warranteed](https://github.com/fhavrlent/warranteed)
 - Purchase date, price, seller, warranty, insurance and sale for every thing; the Value page totals what things cost, by place, kind and tag, and prints an insurance list.
 - Tags, custom fields, documents (stored here or linked from Paperless-ngx), and a maintenance log with reminders through ntfy, Gotify, Discord, Telegram, email and other services.
 - Copy a thing, or save it as a template to add similar ones.
-- Export as a spreadsheet, or everything with photos and documents as a ZIP, and restore that ZIP as a new household.
+- Export as a spreadsheet, or everything with photos and documents as a ZIP, and restore that ZIP (up to 8 GB) as a new household.
 - Several households, such as home and a cottage, each with its own people, invited with a link.
 - API tokens for other apps, such as Warranteed.
 - Sign-in through an OpenID Connect provider (Pocket ID, Authentik, Keycloak, …). There are no local passwords.
@@ -42,7 +42,9 @@ Create an OIDC client in your identity provider with the callback URL `https://<
 - `OIDC_ALLOWED_GROUPS`: only members of these groups can sign in.
 - `OIDC_ADMIN_GROUPS`: members of these groups are admins. If unset, the first user to sign in is the admin.
 
-Group membership is re-checked every hour with a refresh token, so someone removed from the group is signed out within an hour, and their API tokens stop working.
+Group membership is re-checked every hour with a refresh token, so someone removed from the group is signed out within an hour, and their API tokens stop working. The check runs while they have a session here: API tokens of someone who never signs in again keep working until they are deleted, or the person is removed from the household.
+
+The profile picture from the identity provider is downloaded only from public addresses or the provider's own host.
 
 Everyone who signs in starts in a household of their own. Owners invite others with a link from **Settings → Household**; everyone in a household sees and changes all of its things. A person can be in several households and switches between them next to the logo.
 

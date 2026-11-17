@@ -15,12 +15,23 @@ accepting invites answer 403 to a token. Delete it in Settings to stop it
 working; it also stops when its owner leaves that household, or is removed
 from the allowed groups at the identity provider (checked hourly).
 
-A token from connecting an app can do less: what this page lists for keeping
-things in step (reading and adding things, `PATCH` but not `PUT`, photos,
-documents, links, maintenance, the change feed and the hook), and nothing that
-takes the whole household out or changes how it is set up, such as the
-exports, kinds, fields, labels or invites. Anything else answers 403
-(`server.appNotAllowed`). A token made by hand can do all of it.
+A token from connecting an app can do less: only what keeping things in step
+needs. Of what this page lists, that is:
+
+- `GET /api/me`, `GET /api/household`, `GET /api/search`, `GET /api/changes`
+- `GET /api/things`, `POST /api/things`, `GET`, `PATCH` and `DELETE /api/things/{id}`
+- `POST /api/things/{id}/photos`, `GET` and `DELETE /api/photos/{id}`
+- `GET /api/attachments/{id}/file`, `PATCH` and `DELETE /api/attachments/{id}`,
+  `GET /api/paperless`, `POST /api/things/{id}/attachments/paperless`
+- `POST /api/things/{id}/links`
+- `PUT` and `DELETE /api/things/{id}/apps/{source}`, `GET /api/apps/{source}/{externalId}`
+- `POST /api/things/{id}/maintenance`, `PUT` and `DELETE /api/maintenance/{id}`
+- `PUT` and `DELETE /api/hook`, `DELETE /api/token`
+
+Everything else, such as `PUT` of a whole thing, moving, copying or archiving,
+kinds, labels, reports and the exports, answers 403
+(`server.appNotAllowed`). A token made by hand can do all of it, and with it,
+`GET /api/households` lists only the household the token is for.
 
 Errors come as `{"error": "English text", "code": "server.…", "params": {…}}`
 with a 4xx or 5xx status.
@@ -138,5 +149,5 @@ A label's QR code holds `<Wherehouse address>/l/<code>`.
 | --- | --- |
 | `GET /api/report` | Totals: `value` and `insured` by currency, counts, and value by place, kind and tag; `in=<id>` for what is inside one thing. |
 | `GET /api/report/insured` | Insured things that weren't sold. |
-| `GET /api/export.csv`, `GET /api/export.zip` | The household as a spreadsheet, or everything with its files. |
-| `POST /api/restore` | Body: a ZIP from `export.zip`. Makes a new household of it and switches to it; returns what came back. Signed-in session only. |
+| `GET /api/export.csv`, `GET /api/export.zip` | The household as a spreadsheet, or everything with its files. In the spreadsheet, text that would start a formula (`=`, `+`, `-`, `@`) gets an apostrophe in front. |
+| `POST /api/restore` | Body: a ZIP from `export.zip`, up to 8 GB, unpacking to at most 8 GB of files. Makes a new household of it and switches to it; returns what came back. Signed-in session only. |
