@@ -1,24 +1,42 @@
 # Wherehouse
 
+[![CI](https://img.shields.io/github/actions/workflow/status/fhavrlent/wherehouse/ci.yml?branch=main&label=ci&logo=github)](https://github.com/fhavrlent/wherehouse/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/tag/fhavrlent/wherehouse?sort=semver&label=release)](https://github.com/fhavrlent/wherehouse/pkgs/container/wherehouse)
+[![License](https://img.shields.io/github/license/fhavrlent/wherehouse)](LICENSE)
+[![Go](https://img.shields.io/github/go-mod/go-version/fhavrlent/wherehouse?logo=go&logoColor=white)](go.mod)
+
 Self-hosted home inventory: what you own, where it is, and what's in that box.
 
-Wherehouse is a sibling of [Warranteed](https://github.com/fhavrlent/warranteed): Warranteed tracks purchases and warranties, Wherehouse tracks things and the places they're in. It's in early development; [PLAN.md](PLAN.md) says what it does and what comes next.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/things-dark.png">
+  <img alt="Things page with maintenance due, places and recently changed things with the places they're in" src="docs/screenshots/things.png">
+</picture>
+
+<table>
+  <tr>
+    <td width="40%"><img alt="A thing with its details, purchase and warranty, photo, documents and maintenance log" src="docs/screenshots/detail.png"></td>
+    <td width="40%"><img alt="Value of things by place, kind and tag" src="docs/screenshots/value.png"></td>
+    <td width="20%"><img alt="Searching on a phone finds the garage and everything in it" src="docs/screenshots/phone.png"></td>
+  </tr>
+</table>
 
 ## Features
 
 - Things hold things, to any depth: a building holds rooms, a room a shelf, a shelf a toolbox, the toolbox a drill. Each thing has its own details, so a box keeps its price and serial number. Moving a box moves everything in it.
-- Kinds say what things are: building, room, furniture, box and thing come built in; add your own with an icon from about 140, or upload one.
 - Adding a thing takes a photo and a name; on a phone, the camera opens straight away. "Add and next" keeps the place, for filling a box in one go.
 - Search finds things by any word of their name, details, tags, custom fields, label code or the places they're in, as you type. Diacritics don't matter.
 - QR labels for boxes, shelves and things, printed on common label sheets or a label printer. Scanning one (in the app, or with a phone's camera) opens its page. Blank labels can be printed ahead and attached when first scanned.
 - Purchase date, price, seller, warranty, insurance and sale for every thing; the Value page totals what things cost, by place, kind and tag, and prints an insurance list.
-- Tags, custom fields, documents (stored here or linked from Paperless-ngx), and a maintenance log with reminders through ntfy, Gotify, Discord, Telegram, email and other services.
-- Copy a thing, or save it as a template to add similar ones.
-- Export as a spreadsheet, or everything with photos and documents as a ZIP, and restore that ZIP (up to 8 GB) as a new household.
+- A maintenance log for every thing, with reminders through ntfy, Gotify, Discord, Telegram, email and other services.
+- Documents stored here or linked from Paperless-ngx, with links back from Paperless to the thing.
+- Purchases and warranties kept in step with [Warranteed](https://github.com/fhavrlent/warranteed), its sibling app for warranty tracking.
+- Kinds with about 140 icons (or your own), tags, custom fields, copies and templates.
 - Several households, such as home and a cottage, each with its own people, invited with a link.
-- API tokens for other apps, such as Warranteed.
+- Export as a spreadsheet, or everything with photos and documents as a ZIP, and restore that ZIP (up to 8 GB) as a new household.
 - Sign-in through an OpenID Connect provider (Pocket ID, Authentik, Keycloak, …). There are no local passwords.
 - Light and dark theme, usable on phones, in English and Czech.
+
+The [user guide](docs/user-guide.md) shows how to use it, the [integration guide](docs/integrations.md) sets up Paperless-ngx, Warranteed and reminders step by step, and the [API reference](docs/api.md) is for your own scripts and apps.
 
 ## Installation
 
@@ -37,9 +55,18 @@ Run it behind a reverse proxy with HTTPS and set `WHEREHOUSE_APP_URL` to the pub
 
 ## Sign-in
 
-Create an OIDC client in your identity provider with the callback URL `https://<your host>/auth/callback`, then set `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` and `OIDC_PROVIDER_NAME`, as for Warranteed.
+Create an OIDC client in your identity provider with the callback URL `https://<your host>/auth/callback`, then set:
 
-- `OIDC_ALLOWED_GROUPS`: only members of these groups can sign in.
+```env
+OIDC_ISSUER=https://id.example.com
+OIDC_CLIENT_ID=...
+OIDC_CLIENT_SECRET=...
+OIDC_PROVIDER_NAME=Pocket ID
+```
+
+`OIDC_ISSUER` is the URL that serves `/.well-known/openid-configuration`. The client secret can be left empty for public clients.
+
+- `OIDC_ALLOWED_GROUPS`: only members of these groups can sign in. Not needed if your provider already restricts the client to certain groups (Pocket ID does).
 - `OIDC_ADMIN_GROUPS`: members of these groups are admins. If unset, the first user to sign in is the admin.
 
 Group membership is re-checked every hour with a refresh token, so someone removed from the group is signed out within an hour, and their API tokens stop working. The check runs while they have a session here: API tokens of someone who never signs in again keep working until they are deleted, or the person is removed from the household.
@@ -62,7 +89,7 @@ Print at 100 % ("actual size"), with no margins. To use a partly used sheet, ski
 
 ## Paperless-ngx
 
-Set `PAPERLESS_URL` to your Paperless instance (and `PAPERLESS_PUBLIC_URL` if that's an internal address). Each person adds their own API token under **Settings → Paperless-ngx**, so Paperless's permissions decide what they can link. A linked document opens for the rest of the household through the connection of whoever linked it. `PAPERLESS_TOKEN` is optional and only ever used for admins.
+Set `PAPERLESS_URL` to your Paperless instance (and `PAPERLESS_PUBLIC_URL` if that's an internal address). Each person adds their own API token under **Settings → Paperless-ngx**, so Paperless's permissions decide what they can link. A linked document opens for the rest of the household through the connection of whoever linked it. `PAPERLESS_TOKEN` is optional and only ever used for admins. See the [integration guide](docs/integrations.md#paperless-ngx) for links back from Paperless.
 
 ## Reminders
 
@@ -72,9 +99,9 @@ Discord, Telegram, Slack, Pushover, Pushbullet, IFTTT and Join work for everyone
 
 ## Other apps
 
-Apps such as Warranteed use Wherehouse with an API token from **Settings → API tokens**. [docs/api.md](docs/api.md) describes the API.
+Apps such as Warranteed connect from their own settings: Wherehouse asks which household to connect, and the app gets a token that can do only what keeping things in step needs. For your own scripts, make a token under **Settings → API tokens**. [docs/api.md](docs/api.md) describes the API.
 
-A connected app on the local network, such as Warranteed beside Wherehouse, is told about changes only if its host is in `WHEREHOUSE_HOOK_ALLOWED_HOSTS`; without it, the app still finds changes when it next looks, only later.
+A connected app on the local network, such as Warranteed beside Wherehouse, is told about changes only if its host is in `WHEREHOUSE_HOOK_ALLOWED_HOSTS`; without it, the app still finds changes when it next looks, only later. The [integration guide](docs/integrations.md#warranteed) has a Docker Compose example.
 
 ## Configuration
 
