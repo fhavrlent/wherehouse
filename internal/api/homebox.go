@@ -5,12 +5,18 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/fhavrlent/wherehouse/internal/homebox"
 	"github.com/fhavrlent/wherehouse/internal/importer"
 )
+
+// importURL is the address an import may be read from: http or https, a
+// host, and at most a path. No credentials in it, no query or fragment that
+// would end up in the middle of the API paths added to it.
+var importURL = regexp.MustCompile(`^https?://[^/?#@\s]+(/[^?#\s]*)?$`)
 
 // importHomeBox starts copying a HomeBox inventory, in the background.
 // Only admins may, since the server calls the address they give.
@@ -27,7 +33,7 @@ func (s *Server) importHomeBox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.URL = strings.TrimSuffix(strings.TrimSpace(in.URL), "/")
-	if !strings.HasPrefix(in.URL, "http://") && !strings.HasPrefix(in.URL, "https://") {
+	if !importURL.MatchString(in.URL) {
 		writeMsg(w, http.StatusBadRequest, "server.homeboxUrl", nil)
 		return
 	}
