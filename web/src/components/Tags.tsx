@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import type { Tag, TagColor } from "@/lib/api";
 import { useTags } from "@/lib/queries";
+import { useComposing } from "@/lib/ime";
 import { cn } from "@/lib/utils";
 import { fieldBase } from "./ui/input";
 
@@ -38,6 +39,7 @@ export const TagInput = ({ value, onChange }: { value: string[]; onChange: (tags
   const { t } = useTranslation();
   const { data: all = [] } = useTags();
   const [text, setText] = useState("");
+  const ime = useComposing();
   const add = (name: string) => {
     const n = name.trim().replace(/^#/, "");
     if (n && !value.some((v) => v.toLowerCase() === n.toLowerCase())) onChange([...value, n]);
@@ -80,9 +82,13 @@ export const TagInput = ({ value, onChange }: { value: string[]; onChange: (tags
             if (v.endsWith(",")) add(v.slice(0, -1));
             else setText(v);
           }}
+          onCompositionEnd={ime.onCompositionEnd}
           onKeyDown={(e) => {
             if (e.key === "Enter" && text.trim()) {
               e.preventDefault();
+              // Enter that confirms a character being composed (Japanese,
+              // Chinese, Korean) doesn't add the tag yet.
+              if (ime.composing(e)) return;
               add(text);
             } else if (e.key === "Backspace" && !text && value.length) {
               onChange(value.slice(0, -1));

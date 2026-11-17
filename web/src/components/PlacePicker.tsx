@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { api, errorMessage, pathText, type Thing } from "@/lib/api";
 import { useInvalidate, useKinds, usePlaces } from "@/lib/queries";
+import { useComposing } from "@/lib/ime";
 import { cn } from "@/lib/utils";
 import { KindIcon } from "./KindIcon";
 import { Dialog } from "./ui/dialog";
@@ -35,6 +36,7 @@ export const PlacePicker = ({
   const invalidate = useInvalidate();
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
+  const ime = useComposing();
 
   const choices = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -87,9 +89,13 @@ export const PlacePicker = ({
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("picker.search")}
           className="pl-9"
+          onCompositionEnd={ime.onCompositionEnd}
           onKeyDown={(e) => {
             if (e.key === "Enter" && choices[0]) {
               e.preventDefault();
+              // Enter that confirms a character being composed (Japanese,
+              // Chinese, Korean) isn't a pick.
+              if (ime.composing(e)) return;
               pick(choices[0].id, choices[0]);
             }
           }}

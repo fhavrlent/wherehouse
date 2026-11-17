@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Printer, ShieldCheck } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router";
 import { KindIcon } from "@/components/KindIcon";
@@ -197,6 +197,7 @@ export const InsuranceList = () => {
   const { data: household } = useQuery({ queryKey: ["household"], queryFn: api.household });
   const cur = household?.currency ?? "EUR";
   const [today] = useState(() => new Date().toLocaleDateString());
+  const titleId = useId();
   const totals: Money = {};
   for (const th of things) {
     const c = th.currency || cur;
@@ -210,7 +211,7 @@ export const InsuranceList = () => {
       </div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 id={titleId} className="text-2xl font-semibold tracking-tight">
             {t("report.insuranceTitle", { name: household?.name ?? "" })}
           </h1>
           <p className="mt-1 text-sm text-fg-muted">
@@ -224,7 +225,14 @@ export const InsuranceList = () => {
       {things.length === 0 ? (
         <Card className="px-6 py-10 text-center text-sm text-fg-muted">{t("report.noInsured")}</Card>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-border bg-surface print:border-0">
+        // Scrolled sideways on narrow screens: focusable, so it scrolls from the
+        // keyboard too, and named by the heading for screen readers.
+        <div
+          tabIndex={0}
+          role="region"
+          aria-labelledby={titleId}
+          className="overflow-x-auto rounded-2xl border border-border bg-surface outline-none focus-visible:ring-3 focus-visible:ring-ring/40 print:border-0"
+        >
           <table className="w-full text-left text-sm">
             <thead className="border-b border-border text-xs text-fg-muted">
               <tr>
@@ -239,7 +247,7 @@ export const InsuranceList = () => {
             <tbody className="divide-y divide-border">
               {things.map((th) => (
                 <tr key={th.id} className="break-inside-avoid">
-                  <td className="px-3 py-2">
+                  <th scope="row" className="px-3 py-2 font-normal">
                     <Link to={`/i/${th.id}`} className="font-medium hover:text-primary">
                       {th.name}
                     </Link>
@@ -248,7 +256,7 @@ export const InsuranceList = () => {
                         {[th.manufacturer, th.model].filter(Boolean).join(" ")}
                       </span>
                     )}
-                  </td>
+                  </th>
                   <td className="px-3 py-2 text-fg-muted">{th.path.map((p) => p.name).join(" › ")}</td>
                   <td className="px-3 py-2 font-mono text-xs">{th.serial}</td>
                   <td className="px-3 py-2 tabular-nums">{th.purchaseDate}</td>
