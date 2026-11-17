@@ -19,6 +19,7 @@ func TestExport(t *testing.T) {
 	upload(t, h, c, fmt.Sprintf("/api/things/%d/photos", drill.ID), map[string][]byte{"a.png": pngBytes(t)})
 	upload(t, h, c, fmt.Sprintf("/api/things/%d/attachments", drill.ID), map[string][]byte{"manual.pdf": []byte("%PDF-1.4")})
 	add(t, h, c, `{"name":"Gone","soldDate":"2026-01-01"}`)
+	add(t, h, c, `{"name":"=HYPERLINK(\"http://x\")","notes":"-5 cm"}`)
 
 	rec := mustCall(t, h, c, "GET", "/api/export.csv", "", 200)
 	body := strings.TrimPrefix(rec.Body.String(), "\ufeff")
@@ -26,7 +27,7 @@ func TestExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 4 || rows[0][len(rows[0])-1] != "Voltage" {
+	if len(rows) != 5 || rows[0][len(rows[0])-1] != "Voltage" {
 		t.Fatalf("csv = %v", rows)
 	}
 	var drillRow []string
@@ -34,6 +35,15 @@ func TestExport(t *testing.T) {
 		if strings.HasPrefix(r[3], "Vrtačka") {
 			drillRow = r
 		}
+	}
+	var formula []string
+	for _, r := range rows {
+		if strings.Contains(r[3], "HYPERLINK") {
+			formula = r
+		}
+	}
+	if formula == nil || formula[3] != `'=HYPERLINK("http://x")` || formula[10] != "'-5 cm" {
+		t.Errorf("formula row = %v", formula)
 	}
 	if drillRow == nil || drillRow[2] != "Box" || drillRow[12] != "99.5" || drillRow[len(drillRow)-1] != "18 V" {
 		t.Errorf("drill row = %v", drillRow)
@@ -57,7 +67,7 @@ func TestExport(t *testing.T) {
 	if err := json.Unmarshal(data, &b); err != nil {
 		t.Fatal(err)
 	}
-	if len(b.Things) != 3 || len(b.Kinds) != 5 || len(b.Photos) != 1 || len(b.Attachments) != 1 {
+	if len(b.Things) != 4 || len(b.Kinds) != 5 || len(b.Photos) != 1 || len(b.Attachments) != 1 {
 		t.Errorf("backup = %d things, %d kinds, %v, %v", len(b.Things), len(b.Kinds), b.Photos, b.Attachments)
 	}
 }

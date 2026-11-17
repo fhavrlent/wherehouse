@@ -2,10 +2,12 @@ package api
 
 import (
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/fhavrlent/wherehouse/internal/auth"
 	"github.com/fhavrlent/wherehouse/internal/store"
 )
 
@@ -19,6 +21,10 @@ func (s *Server) listHouseholds(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fail(w, err)
 		return
+	}
+	// An app sees only the household its token is for, not its owner's others.
+	if hh, ok := auth.TokenHousehold(r.Context()); ok {
+		list = slices.DeleteFunc(list, func(h store.Household) bool { return h.ID != hh })
 	}
 	writeJSON(w, 200, householdsResponse{Current: household(r), Households: list})
 }

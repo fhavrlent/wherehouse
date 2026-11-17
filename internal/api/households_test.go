@@ -116,3 +116,25 @@ func TestKindsAndIcons(t *testing.T) {
 	mustCall(t, h, c, "DELETE", fmt.Sprintf("/api/kinds/%d", tool.ID), "", 204)
 	mustCall(t, h, c, "DELETE", fmt.Sprintf("/api/icons/%d", icon.ID), "", 204)
 }
+
+func TestHouseholdsWithToken(t *testing.T) {
+	h, c := newTestServer(t)
+	created := decodeAs[struct{ Token string }](t, mustCall(t, h, c, "POST", "/api/tokens", `{"name":"App"}`, 201))
+	mustCall(t, h, c, "POST", "/api/households", `{"name":"Cottage","currency":"EUR"}`, 201)
+	if got := decodeAs[householdsResponse](t, mustCall(t, h, c, "GET", "/api/households", "", 200)); len(got.Households) != 2 {
+		t.Fatalf("signed in: %d households", len(got.Households))
+	}
+	rec := callWithToken(h, "GET", "/api/households", "", created.Token)
+	got := decodeAs[householdsResponse](t, rec)
+	if len(got.Households) != 1 || got.Households[0].ID != got.Current {
+		t.Errorf("with a token: %+v", got)
+	}
+}
+
+func TestImportStatusAdminOnly(t *testing.T) {
+	e := newTestEnv(t)
+	admin := e.signIn(t, "a")
+	other := e.signIn(t, "b")
+	mustCall(t, e.h, admin, "GET", "/api/import/homebox", "", 200)
+	mustCall(t, e.h, other, "GET", "/api/import/homebox", "", 403)
+}

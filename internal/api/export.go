@@ -116,21 +116,35 @@ func (s *Server) exportCSV(w http.ResponseWriter, r *http.Request) {
 		if t.ParentID != nil {
 			parent = strconv.FormatInt(*t.ParentID, 10)
 		}
-		row := []string{strconv.FormatInt(t.ID, 10), parent, strings.Join(path, " / "), t.Name, kindNames[t.Kind.ID],
-			strconv.Itoa(t.Quantity), t.Manufacturer, t.Model, t.Serial, t.Description, t.Notes,
-			optDate(t.PurchaseDate), optNum(t.PurchasePrice), t.Currency, t.PurchaseFrom, optDate(t.WarrantyUntil),
-			yesNo(t.LifetimeWarranty), t.WarrantyDetails, yesNo(t.Insured), optDate(t.SoldDate), optNum(t.SoldPrice),
-			t.SoldTo, t.SoldNotes, strings.Join(tags, "; "), t.Label, optDate(t.ArchivedAt)}
+		row := []string{strconv.FormatInt(t.ID, 10), parent, text(strings.Join(path, " / ")), text(t.Name),
+			text(kindNames[t.Kind.ID]), strconv.Itoa(t.Quantity), text(t.Manufacturer), text(t.Model), text(t.Serial),
+			text(t.Description), text(t.Notes), optDate(t.PurchaseDate), optNum(t.PurchasePrice), text(t.Currency),
+			text(t.PurchaseFrom), optDate(t.WarrantyUntil), yesNo(t.LifetimeWarranty), text(t.WarrantyDetails),
+			yesNo(t.Insured), optDate(t.SoldDate), optNum(t.SoldPrice), text(t.SoldTo), text(t.SoldNotes),
+			text(strings.Join(tags, "; ")), text(t.Label), optDate(t.ArchivedAt)}
 		values := map[int64]string{}
 		for _, v := range t.Fields {
 			values[v.FieldID] = v.Value
 		}
 		for _, f := range fields {
-			row = append(row, values[f.ID])
+			if f.Type == store.FieldNumber {
+				row = append(row, values[f.ID])
+			} else {
+				row = append(row, text(values[f.ID]))
+			}
 		}
 		cw.Write(row)
 	}
 	cw.Flush()
+}
+
+// text is typed text as a CSV cell. Text that a spreadsheet would take for
+// a formula gets an apostrophe in front, so opening the file runs nothing.
+func text(s string) string {
+	if s != "" && strings.ContainsRune("=+-@\t\r", rune(s[0])) {
+		return "'" + s
+	}
+	return s
 }
 
 // backup is what export.zip's wherehouse.json holds.

@@ -20,8 +20,13 @@ import (
 	"github.com/fhavrlent/wherehouse/internal/store"
 )
 
-// maxBackupBytes is the largest backup that can be restored.
+// maxBackupBytes is the largest backup that can be restored, and the most
+// its files may take once unpacked.
 const maxBackupBytes = 8 << 30
+
+// maxBackupJSON is the most wherehouse.json may take unpacked: far more than
+// any real household, but a small archive can't make it fill the memory.
+const maxBackupJSON = 256 << 20
 
 // restoreResult says what a restore brought back.
 type restoreResult struct {
@@ -72,8 +77,10 @@ type restorer struct {
 	uid, hh int64
 	zr      *zip.Reader
 	b       backup
-	// saved are the files written so far, removed if the restore fails.
-	saved []string
+	// saved are the files written so far, removed if the restore fails, and
+	// unpacked how many bytes they took.
+	saved    []string
+	unpacked int64
 	// Old IDs to new ones.
 	kinds, fields, icons, things map[int64]int64
 	res                          restoreResult
@@ -86,7 +93,7 @@ func (s *Server) restore(ctx context.Context, uid int64, zr *zip.Reader) (*resto
 	if err != nil {
 		return nil, badBackup()
 	}
-	err = json.NewDecoder(f).Decode(&rs.b)
+	err = json.NewDecoder(io.LimitReader(f, maxBackupJSON)).Decode(&rs.b)
 	f.Close()
 	if err != nil || rs.b.Format != 1 || rs.b.Household == nil {
 		return nil, badBackup()
@@ -129,7 +136,9 @@ func (rs *restorer) saveFile(path string) (name string, size int64, mimeType str
 		return "", 0, "", badBackup()
 	}
 	defer src.Close()
-	limit := rs.s.cfg.MaxUploadMB << 20
+	// One file may not be larger than an upload, and all of them together
+	// not larger than a backup: a small archive can't fill the disk.
+	limit := min(rs.s.cfg.MaxUploadMB<<20, maxBackupBytes-rs.unpacked)
 	head := make([]byte, 512)
 	n, _ := io.ReadFull(src, head)
 	mimeType = detectType(head[:n], path)
@@ -139,7 +148,11 @@ func (rs *restorer) saveFile(path string) (name string, size int64, mimeType str
 		return "", 0, "", err
 	}
 	rs.saved = append(rs.saved, name)
+	rs.unpacked += size
 	if size > limit {
+		if rs.unpacked > maxBackupBytes {
+			return "", 0, "", i18n.NewError("server.backupTooLarge", nil)
+		}
 		return "", 0, "", i18n.NewError("server.backupFileTooLarge", i18n.Args{"mb": rs.s.cfg.MaxUploadMB})
 	}
 	return name, size, mimeType, nil

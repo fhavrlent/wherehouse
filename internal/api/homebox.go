@@ -72,6 +72,12 @@ func (s *Server) importHomeBox(w http.ResponseWriter, r *http.Request) {
 // importStatus reports how the last import is going, or null when there
 // was none since the server started.
 func (s *Server) importStatus(w http.ResponseWriter, r *http.Request) {
+	// Only admins start imports, and what one brought in is no one else's
+	// business.
+	if !isAdmin(r) {
+		writeMsg(w, http.StatusForbidden, "server.adminOnly", nil)
+		return
+	}
 	s.importMu.Lock()
 	im := s.importer
 	s.importMu.Unlock()
