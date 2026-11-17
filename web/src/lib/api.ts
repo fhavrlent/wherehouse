@@ -540,8 +540,8 @@ export const api = {
   deleteToken: (id: number) => request<undefined>("DELETE", `/api/tokens/${id}`),
 
   /** Allows another app; answers where to send the browser. */
-  allowConnect: (app: string, redirectUri: string, state: string, household: number) =>
-    request<{ redirect: string }>("POST", "/api/connect", { app, redirectUri, state, household }),
+  allowConnect: (app: string, redirectUri: string, state: string, codeChallenge: string, household: number) =>
+    request<{ redirect: string }>("POST", "/api/connect", { app, redirectUri, state, codeChallenge, household }),
   documentThings: (doc: number) => request<Thing[]>("GET", `/api/paperless/documents/${doc}/things`),
 
   importHomebox: (url: string, token: string) => request<ImportProgress>("POST", "/api/import/homebox", { url, token }),

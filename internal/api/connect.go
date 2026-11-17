@@ -2,10 +2,13 @@ package api
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -16,20 +19,24 @@ import (
 
 // Another app connects like this:
 //
-//  1. It sends the person to /connect?app=<name>&redirect_uri=<its URL>&state=<anything>.
+//  1. It makes a random code_verifier and sends the person to
+//     /connect?app=<name>&redirect_uri=<its URL>&state=<anything>
+//     &code_challenge=<base64url SHA-256 of the verifier>&code_challenge_method=S256.
 //  2. Signed in here, they pick a household and allow it; that page posts to
 //     /api/connect, and the browser goes back to redirect_uri with ?code and ?state.
-//  3. The app, server to server, posts {code, redirect_uri} to /connect/token
-//     and gets an API token for that person and household.
+//  3. The app, server to server, posts {code, redirect_uri, code_verifier} to
+//     /connect/token and gets an API token for that person and household.
 //
-// A code works once, for connectCodeTTL, and only with the same redirect_uri.
+// A code works once, for connectCodeTTL, only with the same redirect_uri,
+// and only with the verifier (PKCE, RFC 7636): a code that leaks, e.g. in a
+// log of the app's callback, is no use to anyone else.
 
 const connectCodeTTL = 5 * time.Minute
 
 type connectGrant struct {
-	user, household int64
-	app, redirect   string
-	expires         time.Time
+	user, household          int64
+	app, redirect, challenge string
+	expires                  time.Time
 }
 
 // host is the address the person approved, which the app's pings may go to.
@@ -61,8 +68,9 @@ func (c *connectCodes) add(g connectGrant) string {
 	return code
 }
 
-// take returns and forgets the grant of a code given with the same redirect.
-func (c *connectCodes) take(code, redirect string) (connectGrant, bool) {
+// take returns and forgets the grant of a code given with the same redirect
+// and the verifier of its challenge. A code is used up by any try.
+func (c *connectCodes) take(code, redirect, verifier string) (connectGrant, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	g, ok := c.codes[code]
@@ -70,10 +78,23 @@ func (c *connectCodes) take(code, redirect string) (connectGrant, bool) {
 		return connectGrant{}, false
 	}
 	delete(c.codes, code)
-	if time.Now().After(g.expires) || subtle.ConstantTimeCompare([]byte(g.redirect), []byte(redirect)) != 1 {
+	if time.Now().After(g.expires) || subtle.ConstantTimeCompare([]byte(g.redirect), []byte(redirect)) != 1 ||
+		!verifierRe.MatchString(verifier) || subtle.ConstantTimeCompare([]byte(challengeOf(verifier)), []byte(g.challenge)) != 1 {
 		return connectGrant{}, false
 	}
 	return g, true
+}
+
+// A PKCE verifier is 43 to 128 unreserved characters; its S256 challenge is
+// the unpadded base64url SHA-256 of it, 43 characters.
+var (
+	verifierRe  = regexp.MustCompile(`^[A-Za-z0-9._~-]{43,128}$`)
+	challengeRe = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
+)
+
+func challengeOf(verifier string) string {
+	sum := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
 
 // validRedirect accepts web addresses without fragments.
@@ -93,13 +114,16 @@ func (s *Server) allowConnect(w http.ResponseWriter, r *http.Request) {
 		App         string `json:"app"`
 		RedirectURI string `json:"redirectUri"`
 		State       string `json:"state"`
-		Household   int64  `json:"household"`
+		// CodeChallenge is the app's S256 PKCE challenge.
+		CodeChallenge string `json:"codeChallenge"`
+		Household     int64  `json:"household"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
 	in.App = strings.TrimSpace(in.App)
-	if in.App == "" || utf8.RuneCountInString(in.App) > store.MaxTagName || !validRedirect(in.RedirectURI) || len(in.State) > 500 {
+	if in.App == "" || utf8.RuneCountInString(in.App) > store.MaxTagName || !validRedirect(in.RedirectURI) || len(in.State) > 500 ||
+		!challengeRe.MatchString(in.CodeChallenge) {
 		writeMsg(w, http.StatusBadRequest, "server.connectBad", nil)
 		return
 	}
@@ -108,7 +132,7 @@ func (s *Server) allowConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	code := s.connect.add(connectGrant{user: userID(r), household: in.Household, app: in.App, redirect: in.RedirectURI,
-		expires: time.Now().Add(connectCodeTTL)})
+		challenge: in.CodeChallenge, expires: time.Now().Add(connectCodeTTL)})
 	u, _ := url.Parse(in.RedirectURI)
 	q := u.Query()
 	q.Set("code", code)
@@ -121,13 +145,14 @@ func (s *Server) allowConnect(w http.ResponseWriter, r *http.Request) {
 // app's server, not a browser, so it takes no session.
 func (s *Server) connectToken(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Code        string `json:"code"`
-		RedirectURI string `json:"redirect_uri"`
+		Code         string `json:"code"`
+		RedirectURI  string `json:"redirect_uri"`
+		CodeVerifier string `json:"code_verifier"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
-	g, ok := s.connect.take(in.Code, in.RedirectURI)
+	g, ok := s.connect.take(in.Code, in.RedirectURI, in.CodeVerifier)
 	if !ok {
 		writeMsg(w, http.StatusBadRequest, "server.connectCode", nil)
 		return

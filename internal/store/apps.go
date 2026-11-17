@@ -63,9 +63,14 @@ func (in *AppLinkInput) normalize(source string) error {
 	return nil
 }
 
-// SetAppLink links a thing to what it is in another app, replacing that
-// app's earlier link. Linking it to something else of the app's moves the
-// link.
+// ErrAppLinkTaken: the thing is linked to something else of the app already.
+var ErrAppLinkTaken = errors.New("thing is linked to something else of the app")
+
+// SetAppLink links a thing to what it is in another app, or changes the
+// link. A thing is linked to one thing of an app: one linked to something
+// else of the app is ErrAppLinkTaken, until that is unlinked. Linking what
+// was linked to another thing here moves the link, and the purchase details
+// of that thing become this app's again.
 func (s *Store) SetAppLink(ctx context.Context, hh, thing int64, source string, in AppLinkInput) error {
 	if err := in.normalize(source); err != nil {
 		return err
@@ -81,7 +86,23 @@ func (s *Store) SetAppLink(ctx context.Context, hh, thing int64, source string, 
 		if err := owned(ctx, tx, hh, thing); err != nil {
 			return err
 		}
-		// The same thing of the app can be linked to one thing here only.
+		var current string
+		err := tx.QueryRowContext(ctx, `SELECT external_id FROM thing_links WHERE thing_id = ? AND source = ?`, thing, source).
+			Scan(&current)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		if err == nil && current != in.ExternalID {
+			return ErrAppLinkTaken
+		}
+		// The same thing of the app can be linked to one thing here only:
+		// one it was linked to before is let go, details and all.
+		if _, err := tx.ExecContext(ctx, `UPDATE things SET purchase_owner = '', updated_at = ?
+			WHERE household_id = ? AND id <> ? AND purchase_owner = ?
+				AND id IN (SELECT thing_id FROM thing_links WHERE source = ? AND external_id = ?)`,
+			now(), hh, thing, source, source, in.ExternalID); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM thing_links WHERE source = ? AND external_id = ? AND thing_id <> ?
 			AND thing_id IN (SELECT id FROM things WHERE household_id = ?)`, source, in.ExternalID, thing, hh); err != nil {
 			return err

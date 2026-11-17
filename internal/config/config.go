@@ -27,6 +27,9 @@ type Config struct {
 	// NotifyAllowedHosts are the hosts non-admins may send notifications to
 	// with self-hosted services (ntfy, Gotify, webhooks, SMTP, ...).
 	NotifyAllowedHosts []string
+	// HookAllowedHosts are the hosts of connected apps that may be pinged
+	// on the local network; other apps are pinged only on public addresses.
+	HookAllowedHosts []string
 
 	OIDC      OIDC
 	Paperless Paperless
@@ -106,6 +109,7 @@ func Load() (*Config, error) {
 		NotifyHour:  envInt("WHEREHOUSE_NOTIFY_HOUR", 9, &errs),
 
 		NotifyAllowedHosts: list(os.Getenv("WHEREHOUSE_NOTIFY_ALLOWED_HOSTS")),
+		HookAllowedHosts:   list(os.Getenv("WHEREHOUSE_HOOK_ALLOWED_HOSTS")),
 		Paperless: Paperless{
 			URL:       strings.TrimSuffix(os.Getenv("PAPERLESS_URL"), "/"),
 			PublicURL: strings.TrimSuffix(os.Getenv("PAPERLESS_PUBLIC_URL"), "/"),

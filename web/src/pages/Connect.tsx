@@ -16,6 +16,9 @@ export const Connect = () => {
   const app = params.get("app") ?? "";
   const redirect = params.get("redirect_uri") ?? "";
   const state = params.get("state") ?? "";
+  // PKCE: only the app that started this can swap the code for a token.
+  const challenge = params.get("code_challenge") ?? "";
+  const method = params.get("code_challenge_method") ?? "";
   const { data } = useHouseholds();
   const [household, setHousehold] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -25,7 +28,7 @@ export const Connect = () => {
   } catch {
     /* shown as invalid below */
   }
-  if (!app || !host) {
+  if (!app || !host || !challenge || method !== "S256") {
     return (
       <Card className="mx-auto max-w-md px-6 py-10 text-center text-sm text-fg-muted">{t("connect.invalid")}</Card>
     );
@@ -34,7 +37,7 @@ export const Connect = () => {
   const allow = async () => {
     setBusy(true);
     try {
-      const { redirect: to } = await api.allowConnect(app, redirect, state, chosen);
+      const { redirect: to } = await api.allowConnect(app, redirect, state, challenge, chosen);
       location.assign(to);
     } catch (e) {
       toast.error(errorMessage(e));

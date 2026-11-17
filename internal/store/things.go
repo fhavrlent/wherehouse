@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -567,40 +568,131 @@ func (s *Store) UpdateThing(ctx context.Context, hh, id int64, in ThingInput) (*
 	if err := in.normalize(); err != nil {
 		return nil, err
 	}
+	if err := s.withTx(ctx, func(tx *sql.Tx) error { return s.updateThing(ctx, tx, hh, id, in) }); err != nil {
+		return nil, err
+	}
+	return s.GetThing(ctx, hh, id)
+}
+
+// PatchThing changes only the details in patch (a JSON object with the
+// names of ThingInput), keeping the rest as they are now. It reads and writes
+// in one transaction, so a change made meanwhile to something else, e.g. the
+// thing being moved or sold, isn't written back over.
+func (s *Store) PatchThing(ctx context.Context, hh, id int64, patch json.RawMessage) (*Thing, error) {
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		if err := owned(ctx, tx, hh, id); err != nil {
 			return err
 		}
-		if err := keepOwnedPurchase(ctx, tx, id, &in); err != nil {
+		var in ThingInput
+		var date, until, sold sql.NullString
+		var price, soldPrice sql.NullFloat64
+		var parent sql.NullInt64
+		if err := tx.QueryRowContext(ctx, `
+			SELECT parent_id, kind_id, name, description, quantity, manufacturer, model, serial, notes,
+				purchase_date, purchase_price, purchase_from, currency, warranty_until, lifetime_warranty, warranty_details,
+				insured, sold_date, sold_price, sold_to, sold_notes
+			FROM things WHERE id = ?`, id).Scan(&parent, &in.KindID, &in.Name, &in.Description, &in.Quantity,
+			&in.Manufacturer, &in.Model, &in.Serial, &in.Notes, &date, &price, &in.PurchaseFrom, &in.Currency, &until,
+			&in.LifetimeWarranty, &in.WarrantyDetails, &in.Insured, &sold, &soldPrice, &in.SoldTo, &in.SoldNotes); err != nil {
 			return err
 		}
-		if err := s.checkParent(ctx, tx, hh, id, in.ParentID); err != nil {
+		if parent.Valid {
+			in.ParentID = &parent.Int64
+		}
+		in.PurchaseDate, in.WarrantyUntil, in.SoldDate = nullStr(date), nullStr(until), nullStr(sold)
+		in.PurchasePrice, in.SoldPrice = nullFloat(price), nullFloat(soldPrice)
+		if err := json.Unmarshal(patch, &in); err != nil {
+			return invalid("badRequest", nil)
+		}
+		if err := in.normalize(); err != nil {
 			return err
 		}
-		kind, err := s.kindFor(ctx, tx, hh, in.KindID)
-		if err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `
-			UPDATE things SET parent_id = ?, kind_id = ?, name = ?, description = ?, quantity = ?, manufacturer = ?, model = ?,
-				serial = ?, notes = ?, purchase_date = ?, purchase_price = ?, purchase_from = ?, currency = ?, warranty_until = ?,
-				lifetime_warranty = ?, warranty_details = ?, insured = ?, sold_date = ?, sold_price = ?, sold_to = ?, sold_notes = ?,
-				updated_at = ?
-			WHERE id = ?`,
-			in.ParentID, kind, in.Name, in.Description, in.Quantity, in.Manufacturer, in.Model, in.Serial, in.Notes,
-			in.PurchaseDate, in.PurchasePrice, in.PurchaseFrom, in.Currency, in.WarrantyUntil, in.LifetimeWarranty,
-			in.WarrantyDetails, in.Insured, in.SoldDate, in.SoldPrice, in.SoldTo, in.SoldNotes, now(), id); err != nil {
-			return err
-		}
-		if err := setDetails(ctx, tx, hh, id, in); err != nil {
-			return err
-		}
-		return s.reindexInside(ctx, tx, hh, id)
+		return s.updateThing(ctx, tx, hh, id, in)
 	})
 	if err != nil {
 		return nil, err
 	}
 	return s.GetThing(ctx, hh, id)
+}
+
+func nullStr(v sql.NullString) *string {
+	if !v.Valid {
+		return nil
+	}
+	return &v.String
+}
+
+func nullFloat(v sql.NullFloat64) *float64 {
+	if !v.Valid {
+		return nil
+	}
+	return &v.Float64
+}
+
+func (s *Store) updateThing(ctx context.Context, tx *sql.Tx, hh, id int64, in ThingInput) error {
+	if err := owned(ctx, tx, hh, id); err != nil {
+		return err
+	}
+	if err := keepOwnedPurchase(ctx, tx, id, &in); err != nil {
+		return err
+	}
+	if err := s.checkParent(ctx, tx, hh, id, in.ParentID); err != nil {
+		return err
+	}
+	kind, err := s.kindFor(ctx, tx, hh, in.KindID)
+	if err != nil {
+		return err
+	}
+	// Moving or renaming it changes the paths of everything inside it.
+	var oldParent sql.NullInt64
+	var oldName string
+	if err := tx.QueryRowContext(ctx, `SELECT parent_id, name FROM things WHERE id = ?`, id).Scan(&oldParent, &oldName); err != nil {
+		return err
+	}
+	pathChanged := oldName != in.Name || oldParent.Valid != (in.ParentID != nil) ||
+		(in.ParentID != nil && oldParent.Int64 != *in.ParentID)
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE things SET parent_id = ?, kind_id = ?, name = ?, description = ?, quantity = ?, manufacturer = ?, model = ?,
+			serial = ?, notes = ?, purchase_date = ?, purchase_price = ?, purchase_from = ?, currency = ?, warranty_until = ?,
+			lifetime_warranty = ?, warranty_details = ?, insured = ?, sold_date = ?, sold_price = ?, sold_to = ?, sold_notes = ?,
+			updated_at = ?
+		WHERE id = ?`,
+		in.ParentID, kind, in.Name, in.Description, in.Quantity, in.Manufacturer, in.Model, in.Serial, in.Notes,
+		in.PurchaseDate, in.PurchasePrice, in.PurchaseFrom, in.Currency, in.WarrantyUntil, in.LifetimeWarranty,
+		in.WarrantyDetails, in.Insured, in.SoldDate, in.SoldPrice, in.SoldTo, in.SoldNotes, now(), id); err != nil {
+		return err
+	}
+	if err := setDetails(ctx, tx, hh, id, in); err != nil {
+		return err
+	}
+	if pathChanged {
+		if err := s.touchInside(ctx, tx, hh, id); err != nil {
+			return err
+		}
+	}
+	return s.reindexInside(ctx, tx, hh, id)
+}
+
+// touchInside marks everything inside a thing as changed now, e.g. when its
+// path changed with the thing's, so apps reading the change feed see it.
+func (s *Store) touchInside(ctx context.Context, tx *sql.Tx, hh, id int64) error {
+	t, err := s.loadTree(ctx, tx, hh)
+	if err != nil {
+		return err
+	}
+	ids := t.inside(id)[1:]
+	for len(ids) > 0 {
+		n := min(len(ids), 500)
+		args := []any{now()}
+		for _, x := range ids[:n] {
+			args = append(args, x)
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE things SET updated_at = ? WHERE id IN (`+placeholders(n)+`)`, args...); err != nil {
+			return err
+		}
+		ids = ids[n:]
+	}
+	return nil
 }
 
 // keepOwnedPurchase keeps the purchase and warranty details another app
@@ -642,6 +734,9 @@ func (s *Store) Move(ctx context.Context, hh int64, ids []int64, parent *int64) 
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, `UPDATE things SET parent_id = ?, updated_at = ? WHERE id = ?`, parent, now(), id); err != nil {
+				return err
+			}
+			if err := s.touchInside(ctx, tx, hh, id); err != nil {
 				return err
 			}
 			if err := s.reindexInside(ctx, tx, hh, id); err != nil {

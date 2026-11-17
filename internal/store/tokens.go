@@ -103,8 +103,10 @@ func (s *Store) DeleteUserTokens(ctx context.Context, userID int64) error {
 }
 
 // TokenAuth is which token a request was made with, and its household.
+// App says it was made by connecting an app, not by hand.
 type TokenAuth struct {
 	ID, Household int64
+	App           bool
 }
 
 // TokenUser returns whose an API token is and the household it works in,
@@ -117,12 +119,13 @@ func (s *Store) TokenUser(ctx context.Context, raw string) (*User, TokenAuth, er
 	var u User
 	var id, hh int64
 	var used sql.NullString
+	var app bool
 	err := s.db.QueryRowContext(ctx, `
-		SELECT t.id, t.household_id, t.last_used_at, u.id, u.email, u.name, u.picture_etag, u.is_admin
+		SELECT t.id, t.household_id, t.app_host <> '', t.last_used_at, u.id, u.email, u.name, u.picture_etag, u.is_admin
 		FROM api_tokens t JOIN users u ON u.id = t.user_id
 		JOIN household_members m ON m.household_id = t.household_id AND m.user_id = t.user_id
 		WHERE t.token_hash = ?`, hashToken(raw),
-	).Scan(&id, &hh, &used, &u.ID, &u.Email, &u.Name, &u.Picture, &u.IsAdmin)
+	).Scan(&id, &hh, &app, &used, &u.ID, &u.Email, &u.Name, &u.Picture, &u.IsAdmin)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, TokenAuth{}, ErrNotFound
 	}
@@ -134,7 +137,7 @@ func (s *Store) TokenUser(ctx context.Context, raw string) (*User, TokenAuth, er
 	if t, err := time.Parse(timeLayout, used.String); !used.Valid || err != nil || time.Since(t) > time.Hour {
 		s.db.ExecContext(ctx, `UPDATE api_tokens SET last_used_at = ? WHERE id = ?`, now(), id)
 	}
-	return &u, TokenAuth{ID: id, Household: hh}, nil
+	return &u, TokenAuth{ID: id, Household: hh, App: app}, nil
 }
 
 // ---- links ----
