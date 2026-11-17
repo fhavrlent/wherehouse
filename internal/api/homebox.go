@@ -32,12 +32,12 @@ func (s *Server) importHomeBox(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	in.URL = strings.TrimSuffix(strings.TrimSpace(in.URL), "/")
-	if !importURL.MatchString(in.URL) {
+	base := strings.TrimSuffix(strings.TrimSpace(in.URL), "/")
+	if !importURL.MatchString(base) {
 		writeMsg(w, http.StatusBadRequest, "server.homeboxUrl", nil)
 		return
 	}
-	hb := homebox.New(in.URL, strings.TrimSpace(in.Token))
+	hb := homebox.New(base, strings.TrimSpace(in.Token))
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	if _, err := hb.Self(ctx); err != nil {
