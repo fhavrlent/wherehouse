@@ -39,6 +39,7 @@ func (s *Server) createHousehold(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	go s.hooks.households(userID(r), id)
 	writeJSON(w, http.StatusCreated, map[string]int64{"id": id})
 }
 
@@ -139,13 +140,22 @@ func (s *Server) acceptInvite(w http.ResponseWriter, r *http.Request) {
 		writeMsg(w, http.StatusForbidden, "server.ownerOnly", nil)
 		return
 	}
-	if _, err := s.store.AcceptInvite(r.Context(), r.PathValue("token"), userID(r)); err != nil {
+	var already bool
+	if inv, err := s.store.Invite(r.Context(), r.PathValue("token")); err == nil {
+		_, err := s.store.Role(r.Context(), inv.ID, userID(r))
+		already = err == nil
+	}
+	hh, err := s.store.AcceptInvite(r.Context(), r.PathValue("token"), userID(r))
+	if err != nil {
 		if err == store.ErrNotFound {
 			writeMsg(w, http.StatusNotFound, "server.inviteGone", nil)
 			return
 		}
 		fail(w, err)
 		return
+	}
+	if !already {
+		go s.hooks.households(userID(r), hh)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

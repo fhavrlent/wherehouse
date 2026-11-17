@@ -117,6 +117,7 @@ func (s *Server) Handler() http.Handler {
 
 	api.HandleFunc("DELETE /api/links/{id}", s.deleteLink)
 	api.HandleFunc("POST /api/connect", s.allowConnect)
+	api.HandleFunc("GET /api/connect/households", s.connectHouseholds)
 	api.HandleFunc("PUT /api/hook", s.setHook)
 	api.HandleFunc("DELETE /api/hook", s.removeHook)
 	api.HandleFunc("DELETE /api/token", s.revokeOwnToken)

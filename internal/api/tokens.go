@@ -69,10 +69,11 @@ func (s *Server) revokeOwnToken(w http.ResponseWriter, r *http.Request) {
 // takes the whole household out (exports) or changes how it is set up. A
 // token made by hand, for the person's own scripts, may do everything.
 var appRoutes = map[string]bool{
-	"GET /api/me":        true,
-	"GET /api/household": true,
-	"GET /api/search":    true,
-	"GET /api/changes":   true,
+	"GET /api/me":                 true,
+	"GET /api/connect/households": true,
+	"GET /api/household":          true,
+	"GET /api/search":             true,
+	"GET /api/changes":            true,
 
 	"GET /api/things":                    true,
 	"POST /api/things":                   true,

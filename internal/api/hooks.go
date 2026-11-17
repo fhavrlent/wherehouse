@@ -75,13 +75,29 @@ func (h *hooks) changed(hh, except int64) {
 			h.mu.Lock()
 			delete(h.pending, hook.TokenID)
 			h.mu.Unlock()
-			h.send(hook, hh)
+			h.send(hook, "changed", hh)
 		})
 	}
 }
 
-func (h *hooks) send(hook store.Hook, hh int64) {
-	body, _ := json.Marshal(map[string]any{"event": "changed", "household": hh, "at": time.Now().UTC().Format(time.RFC3339)})
+// households tells the person's connected apps that they made or joined a
+// household, so the apps can offer to connect it too. It goes to every app
+// token of theirs with a hook, whatever household the token is for.
+func (h *hooks) households(uid, hh int64) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	list, err := h.store.UserHooks(ctx, uid)
+	if err != nil {
+		slog.Warn("hooks", "err", err)
+		return
+	}
+	for _, hook := range list {
+		h.send(hook, "households", hh)
+	}
+}
+
+func (h *hooks) send(hook store.Hook, event string, hh int64) {
+	body, _ := json.Marshal(map[string]any{"event": event, "household": hh, "at": time.Now().UTC().Format(time.RFC3339)})
 	req, err := http.NewRequest(http.MethodPost, hook.URL, bytes.NewReader(body))
 	if err != nil {
 		return

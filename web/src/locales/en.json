@@ -231,7 +231,6 @@
     "homeboxToken": "HomeBox rejected the API key",
     "importRunning": "An import is already running",
     "tokenName": "Give the token a name, e.g. the app that uses it",
-    "tooManyTokens": "At most {{max}} tokens",
     "linkUrl": "Links must be web addresses starting with http:// or https://",
     "tooManyLinks": "At most {{max}} links",
     "ownerOnly": "Only the household’s owners can do that",
@@ -270,7 +269,8 @@
     "sessionOnly": "An API token can’t do that; sign in instead",
     "backupTooLarge": "The backup is too large",
     "backupInvalid": "That isn't a Wherehouse backup (export.zip)",
-    "backupFileTooLarge": "A file in the backup is larger than {{mb}} MB"
+    "backupFileTooLarge": "A file in the backup is larger than {{mb}} MB",
+    "connectedAppOnly": "Only the token of a connected app can do this"
   },
   "signIn": {
     "unreachable": "Could not reach the identity provider. Try again in a moment.",
@@ -615,7 +615,14 @@
     "body": "{{app}} at {{host}} wants to use Wherehouse as you: see and change the things of the household you pick.",
     "household": "Household",
     "hint": "You can disconnect it any time by deleting its token in Settings → API tokens.",
-    "allow": "Allow"
+    "allow": "Allow",
+    "bodyMany": "{{app}} at {{host}} wants to use Wherehouse as you: see and change the things of the households you tick.",
+    "households": "Households",
+    "connected": "Connected",
+    "members_one": "Only you",
+    "members_other": "{{count}} people",
+    "allConnected": "{{app}} is connected to all your households already. Tick one to connect it again, e.g. if {{app}} lost its connection.",
+    "reconnect": "Connected; allowing connects it again"
   },
   "document": {
     "title": "Paperless document {{id}}",

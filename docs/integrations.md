@@ -42,7 +42,7 @@ With **Link documents back to Wherehouse** on, under **Settings → Paperless-ng
 
 1. In Warranteed, set `WHEREHOUSE_URL` to where Warranteed reaches Wherehouse, and `WHEREHOUSE_PUBLIC_URL` if browsers use another address.
 2. If Warranteed runs on your local network, beside Wherehouse in Docker for example, set `WHEREHOUSE_HOOK_ALLOWED_HOSTS` in Wherehouse to its host name (e.g. `warranteed`). Restart both.
-3. Each person clicks **Connect to Wherehouse** under **Settings → Wherehouse** in Warranteed. Wherehouse asks which household to connect and shows the address of the app asking; **Allow** sends them back connected. There's no token to copy.
+3. Each person clicks **Connect to Wherehouse** under **Settings → Wherehouse** in Warranteed. Wherehouse asks which households to connect and shows the address of the app asking; **Allow** sends them back connected. There's no token to copy.
 
 Both apps in one Docker Compose file, in the same network:
 
@@ -66,7 +66,7 @@ volumes:
 
 ### What a connected app can do
 
-Connecting creates a token under **Settings → API tokens**, named after the app. It acts as the person who allowed it, in the household they picked, and can do only what keeping things in step needs: read and change things, their photos, documents, links and maintenance, and follow changes. It can't export the household, change its kinds, people or settings, or create other tokens. Deleting the token, or disconnecting in Warranteed, disconnects the app.
+Connecting creates a token under **Settings → API tokens** for each household connected, named after the app. Each acts as the person who allowed it, in its household, and can do only what keeping things in step needs: read and change things, their photos, documents, links and maintenance, and follow changes. It can't export the household, change its kinds, people or settings, or create other tokens. Deleting the token, or disconnecting in Warranteed, disconnects the app.
 
 ### Being told about changes
 

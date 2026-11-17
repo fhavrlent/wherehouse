@@ -18,9 +18,6 @@ import (
 // TokenPrefix starts every API token, so they are easy to recognise.
 const TokenPrefix = "wherehouse_"
 
-// MaxTokens is the most API tokens one person can have.
-const MaxTokens = 20
-
 type Token struct {
 	ID int64 `json:"id"`
 	// Household is the household the token works in.
@@ -40,30 +37,83 @@ func (s *Store) CreateToken(ctx context.Context, userID, hh int64, name string) 
 	case utf8.RuneCountInString(name) > MaxTagName:
 		return "", nil, invalid("nameLong", i18n.Args{"max": MaxTagName})
 	}
-	b := make([]byte, 24)
-	rand.Read(b)
-	raw := TokenPrefix + hex.EncodeToString(b)
-	t := &Token{Household: hh, Name: name, CreatedAt: now()}
-	err := s.withTx(ctx, func(tx *sql.Tx) error {
-		var count int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM api_tokens WHERE user_id = ?`, userID).Scan(&count); err != nil {
-			return err
-		}
-		if count >= MaxTokens {
-			return invalid("tooManyTokens", i18n.Args{"max": MaxTokens})
-		}
-		res, err := tx.ExecContext(ctx, `INSERT INTO api_tokens (user_id, household_id, name, token_hash, created_at) VALUES (?, ?, ?, ?, ?)`,
-			userID, hh, name, hashToken(raw), t.CreatedAt)
-		if err != nil {
-			return err
-		}
-		t.ID, err = res.LastInsertId()
+	var raw string
+	var t *Token
+	err := s.withTx(ctx, func(tx *sql.Tx) (err error) {
+		raw, t, err = createToken(ctx, tx, userID, hh, name)
 		return err
 	})
 	if err != nil {
 		return "", nil, err
 	}
 	return raw, t, nil
+}
+
+func createToken(ctx context.Context, tx *sql.Tx, userID, hh int64, name string) (string, *Token, error) {
+	b := make([]byte, 24)
+	rand.Read(b)
+	raw := TokenPrefix + hex.EncodeToString(b)
+	t := &Token{Household: hh, Name: name, CreatedAt: now()}
+	res, err := tx.ExecContext(ctx, `INSERT INTO api_tokens (user_id, household_id, name, token_hash, created_at) VALUES (?, ?, ?, ?, ?)`,
+		userID, hh, name, hashToken(raw), t.CreatedAt)
+	if err != nil {
+		return "", nil, err
+	}
+	t.ID, err = res.LastInsertId()
+	return raw, t, err
+}
+
+// AppToken is a token made for an app in one household.
+type AppToken struct {
+	Token         string
+	Household     int64
+	HouseholdName string
+}
+
+// CreateAppTokens makes the app's tokens, at the host the person approved,
+// for each household they are still in, all or none. With replace, the
+// app's earlier tokens there are deleted first.
+func (s *Store) CreateAppTokens(ctx context.Context, uid int64, app, host string, households []int64, replace bool) ([]AppToken, error) {
+	app = strings.TrimSpace(app)
+	switch {
+	case app == "":
+		return nil, invalid("tokenName", nil)
+	case utf8.RuneCountInString(app) > MaxTagName:
+		return nil, invalid("nameLong", i18n.Args{"max": MaxTagName})
+	}
+	out := []AppToken{}
+	err := s.withTx(ctx, func(tx *sql.Tx) error {
+		for _, hh := range households {
+			var name string
+			err := tx.QueryRowContext(ctx, `SELECT h.name FROM households h JOIN household_members m ON m.household_id = h.id
+				WHERE h.id = ? AND m.user_id = ?`, hh, uid).Scan(&name)
+			if errors.Is(err, sql.ErrNoRows) {
+				continue // left it since allowing
+			}
+			if err != nil {
+				return err
+			}
+			if replace {
+				if _, err := tx.ExecContext(ctx, `DELETE FROM api_tokens WHERE user_id = ? AND household_id = ? AND name = ? AND app_host = ?`,
+					uid, hh, app, host); err != nil {
+					return err
+				}
+			}
+			raw, t, err := createToken(ctx, tx, uid, hh, app)
+			if err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `UPDATE api_tokens SET app_host = ? WHERE id = ?`, host, t.ID); err != nil {
+				return err
+			}
+			out = append(out, AppToken{Token: raw, Household: hh, HouseholdName: name})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (s *Store) ListTokens(ctx context.Context, userID int64) ([]Token, error) {
@@ -281,12 +331,6 @@ type Hook struct {
 	Secret  string
 }
 
-// SetTokenAppHost records the host a person approved for an app's token.
-func (s *Store) SetTokenAppHost(ctx context.Context, tokenID int64, host string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE api_tokens SET app_host = ? WHERE id = ?`, host, tokenID)
-	return err
-}
-
 // TokenAppHost returns the host approved for a token, "" for tokens people
 // made themselves.
 func (s *Store) TokenAppHost(ctx context.Context, tokenID int64) (string, error) {
@@ -311,11 +355,54 @@ func (s *Store) SetHook(ctx context.Context, tokenID int64, url string) (string,
 	return secret, err
 }
 
+// TokenApp returns the app name and approved host of a token from
+// connecting; host is "" for tokens people made themselves.
+func (s *Store) TokenApp(ctx context.Context, tokenID int64) (app, host string, err error) {
+	err = s.db.QueryRowContext(ctx, `SELECT name, app_host FROM api_tokens WHERE id = ?`, tokenID).Scan(&app, &host)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", ErrNotFound
+	}
+	return app, host, err
+}
+
+// AppHouseholds returns the households in which the person has connected
+// the app at that host.
+func (s *Store) AppHouseholds(ctx context.Context, uid int64, app, host string) (map[int64]bool, error) {
+	out := map[int64]bool{}
+	if host == "" {
+		return out, nil
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT household_id FROM api_tokens WHERE user_id = ? AND name = ? AND app_host = ?`,
+		uid, strings.TrimSpace(app), host)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
+// UserHooks lists the hooks of a person's tokens, in households they are
+// still in.
+func (s *Store) UserHooks(ctx context.Context, uid int64) ([]Hook, error) {
+	return s.hooks(ctx, `t.user_id = ?`, uid)
+}
+
 // Hooks lists the hooks of a household's tokens, of people still in it.
 func (s *Store) Hooks(ctx context.Context, hh int64) ([]Hook, error) {
+	return s.hooks(ctx, `t.household_id = ?`, hh)
+}
+
+func (s *Store) hooks(ctx context.Context, where string, arg int64) ([]Hook, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT t.id, t.hook_url, t.hook_secret FROM api_tokens t
 		JOIN household_members m ON m.household_id = t.household_id AND m.user_id = t.user_id
-		WHERE t.household_id = ? AND t.hook_url <> ''`, hh)
+		WHERE `+where+` AND t.hook_url <> ''`, arg)
 	if err != nil {
 		return nil, err
 	}

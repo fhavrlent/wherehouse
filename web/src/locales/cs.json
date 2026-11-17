@@ -239,7 +239,6 @@
     "homeboxToken": "HomeBox odmítl API klíč",
     "importRunning": "Import už běží",
     "tokenName": "Pojmenujte token, třeba podle aplikace, která ho použije",
-    "tooManyTokens": "Nejvýš {{max}} tokenů",
     "linkUrl": "Odkazy musí být webové adresy začínající http:// nebo https://",
     "tooManyLinks": "Nejvýš {{max}} odkazů",
     "ownerOnly": "To můžou jen vlastníci domácnosti",
@@ -280,7 +279,8 @@
     "sessionOnly": "S API tokenem to nejde, přihlaste se",
     "backupTooLarge": "Záloha je příliš velká",
     "backupInvalid": "Tohle není záloha z Wherehouse (export.zip)",
-    "backupFileTooLarge": "Soubor v záloze je větší než {{mb}} MB"
+    "backupFileTooLarge": "Soubor v záloze je větší než {{mb}} MB",
+    "connectedAppOnly": "Tohle může jen token připojené aplikace"
   },
   "signIn": {
     "unreachable": "Poskytovatel identity není dostupný. Zkuste to za chvíli znovu.",
@@ -657,7 +657,16 @@
     "body": "{{app}} na {{host}} chce používat Wherehouse vaším jménem: vidět a měnit věci domácnosti, kterou vyberete.",
     "household": "Domácnost",
     "hint": "Odpojíte ji kdykoli smazáním jejího tokenu v Nastavení → API tokeny.",
-    "allow": "Povolit"
+    "allow": "Povolit",
+    "bodyMany": "{{app}} na {{host}} chce používat Wherehouse vaším jménem: vidět a měnit věci domácností, které zaškrtnete.",
+    "households": "Domácnosti",
+    "connected": "Připojeno",
+    "members_one": "Jen vy",
+    "members_few": "{{count}} lidé",
+    "members_many": "{{count}} lidí",
+    "members_other": "{{count}} lidí",
+    "allConnected": "{{app}} už je připojená ke všem vašim domácnostem. Zaškrtněte některou, pokud ji chcete připojit znovu, třeba když {{app}} spojení ztratila.",
+    "reconnect": "Připojeno; povolením se připojí znovu"
   },
   "document": {
     "title": "Dokument {{id}} v Paperless",

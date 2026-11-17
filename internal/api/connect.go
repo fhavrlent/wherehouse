@@ -9,11 +9,13 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
+	"github.com/fhavrlent/wherehouse/internal/auth"
 	"github.com/fhavrlent/wherehouse/internal/store"
 )
 
@@ -27,6 +29,14 @@ import (
 //  3. The app, server to server, posts {code, redirect_uri, code_verifier} to
 //     /connect/token and gets an API token for that person and household.
 //
+// With &multiple=1 the person ticks one or more households, and step 3
+// answers with a token for each: {tokens: [{household, token}]}. Connecting
+// a household the app at that host is already connected to, either way,
+// replaces its old token, e.g. when the app lost it; the page shows such
+// households as connected, ticked to begin with only when the app names one
+// in &household=. An app token lists the person's households, and which of them the
+// app is connected to, at GET /api/connect/households.
+//
 // A code works once, for connectCodeTTL, only with the same redirect_uri,
 // and only with the verifier (PKCE, RFC 7636): a code that leaks, e.g. in a
 // log of the app's callback, is no use to anyone else.
@@ -34,7 +44,11 @@ import (
 const connectCodeTTL = 5 * time.Minute
 
 type connectGrant struct {
-	user, household          int64
+	user, household int64
+	// households are the ones ticked with multiple, which answers with a
+	// token for each.
+	households               []int64
+	multiple                 bool
 	app, redirect, challenge string
 	expires                  time.Time
 }
@@ -117,6 +131,9 @@ func (s *Server) allowConnect(w http.ResponseWriter, r *http.Request) {
 		// CodeChallenge is the app's S256 PKCE challenge.
 		CodeChallenge string `json:"codeChallenge"`
 		Household     int64  `json:"household"`
+		// Multiple asks for a token for each of Households.
+		Multiple   bool    `json:"multiple"`
+		Households []int64 `json:"households"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -127,12 +144,29 @@ func (s *Server) allowConnect(w http.ResponseWriter, r *http.Request) {
 		writeMsg(w, http.StatusBadRequest, "server.connectBad", nil)
 		return
 	}
-	if _, err := s.store.Role(r.Context(), in.Household, userID(r)); err != nil {
-		fail(w, err)
-		return
+	g := connectGrant{user: userID(r), household: in.Household, app: in.App, redirect: in.RedirectURI,
+		challenge: in.CodeChallenge, expires: time.Now().Add(connectCodeTTL)}
+	if in.Multiple {
+		g.multiple, g.household = true, 0
+		for _, hh := range in.Households {
+			if !slices.Contains(g.households, hh) {
+				g.households = append(g.households, hh)
+			}
+		}
+		if len(g.households) == 0 || len(g.households) > store.MaxHouseholds {
+			writeMsg(w, http.StatusBadRequest, "server.connectBad", nil)
+			return
+		}
+	} else {
+		g.households = []int64{in.Household}
 	}
-	code := s.connect.add(connectGrant{user: userID(r), household: in.Household, app: in.App, redirect: in.RedirectURI,
-		challenge: in.CodeChallenge, expires: time.Now().Add(connectCodeTTL)})
+	for _, hh := range g.households {
+		if _, err := s.store.Role(r.Context(), hh, userID(r)); err != nil {
+			fail(w, err)
+			return
+		}
+	}
+	code := s.connect.add(g)
 	u, _ := url.Parse(in.RedirectURI)
 	q := u.Query()
 	q.Set("code", code)
@@ -157,19 +191,88 @@ func (s *Server) connectToken(w http.ResponseWriter, r *http.Request) {
 		writeMsg(w, http.StatusBadRequest, "server.connectCode", nil)
 		return
 	}
-	raw, tok, err := s.store.CreateToken(r.Context(), g.user, g.household, g.app)
+	if !g.multiple {
+		made, err := s.store.CreateAppTokens(r.Context(), g.user, g.app, g.host(), []int64{g.household}, true)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		if len(made) == 0 {
+			fail(w, store.ErrNotFound)
+			return
+		}
+		writeJSON(w, 200, connectedToken{Token: made[0].Token, Household: householdBrief{ID: made[0].Household, Name: made[0].HouseholdName}})
+		return
+	}
+	// All households' tokens or none, so a failure leaves no token the app
+	// never got.
+	made, err := s.store.CreateAppTokens(r.Context(), g.user, g.app, g.host(), g.households, true)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	if err := s.store.SetTokenAppHost(r.Context(), tok.ID, g.host()); err != nil {
-		fail(w, err)
-		return
+	tokens := make([]connectedToken, 0, len(made))
+	for _, m := range made {
+		tokens = append(tokens, connectedToken{Token: m.Token, Household: householdBrief{ID: m.Household, Name: m.HouseholdName}})
 	}
-	h, err := s.store.GetHousehold(r.Context(), g.household)
+	writeJSON(w, 200, map[string]any{"tokens": tokens})
+}
+
+type connectedToken struct {
+	Token     string         `json:"token"`
+	Household householdBrief `json:"household"`
+}
+
+type householdBrief struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+type connectHousehold struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Members   int    `json:"members"`
+	Connected bool   `json:"connected"`
+}
+
+// connectHouseholds lists the person's households and whether the app is
+// connected to each: with an app's token, that app at its host; signed in,
+// the app and redirect_uri of the connect page asking.
+func (s *Server) connectHouseholds(w http.ResponseWriter, r *http.Request) {
+	var app, host string
+	if t, ok := auth.Token(r.Context()); ok {
+		var err error
+		if app, host, err = s.store.TokenApp(r.Context(), t.ID); err != nil {
+			fail(w, err)
+			return
+		}
+		// A token made by hand sees only its own household.
+		if host == "" {
+			writeMsg(w, http.StatusForbidden, "server.connectedAppOnly", nil)
+			return
+		}
+	} else {
+		q := r.URL.Query()
+		if !validRedirect(q.Get("redirect_uri")) {
+			writeMsg(w, http.StatusBadRequest, "server.connectBad", nil)
+			return
+		}
+		app = q.Get("app")
+		host = connectGrant{redirect: q.Get("redirect_uri")}.host()
+	}
+	list, err := s.store.ListHouseholds(r.Context(), userID(r))
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"token": raw, "household": map[string]any{"id": h.ID, "name": h.Name}})
+	connected, err := s.store.AppHouseholds(r.Context(), userID(r), app, host)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	out := make([]connectHousehold, 0, len(list))
+	for _, h := range list {
+		out = append(out, connectHousehold{ID: h.ID, Name: h.Name, Members: h.Members, Connected: connected[h.ID]})
+	}
+	writeJSON(w, 200, out)
 }

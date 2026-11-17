@@ -18,7 +18,7 @@ from the allowed groups at the identity provider (checked hourly).
 A token from connecting an app can do less: only what keeping things in step
 needs. Of what this page lists, that is:
 
-- `GET /api/me`, `GET /api/household`, `GET /api/search`, `GET /api/changes`
+- `GET /api/me`, `GET /api/household`, `GET /api/connect/households`, `GET /api/search`, `GET /api/changes`
 - `GET /api/things`, `POST /api/things`, `GET`, `PATCH` and `DELETE /api/things/{id}`
 - `POST /api/things/{id}/photos`, `GET` and `DELETE /api/photos/{id}`
 - `GET /api/attachments/{id}/file`, `PATCH` and `DELETE /api/attachments/{id}`,
@@ -56,6 +56,38 @@ them.
 When the person disconnects your app, `DELETE /api/token` with its token ends
 it.
 
+### Several households
+
+A token is for one household. To connect several, add `&multiple=1` to the
+`/connect` link, and optionally `&household=<id>` to tick one to begin with.
+The person ticks one or more households; those your app (the same `app` name,
+at the host of `redirect_uri`) is already connected to are shown as connected.
+`POST /connect/token` then answers with a token for each:
+
+```json
+{"tokens": [{"household": {"id": 1, "name": "Home"}, "token": "wherehouse_…"}]}
+```
+
+Each token works like one from a single connection, with its own change feed
+and hook.
+
+Connecting a household again, with or without `multiple`, replaces your app's
+earlier token for it (the same `app` name at the same host), so use it when
+your app has lost a token. On the page, households already connected are
+shown as connected and can be ticked to connect them again; name one in
+`&household=<id>` to have it ticked to begin with.
+
+`GET /api/connect/households`, with any of your app's tokens, lists the
+person's households: `[{"id", "name", "members", "connected"}]`, `connected`
+saying whether your app has a token for it. Use it to offer connecting the
+rest, with another `multiple=1` link. A token made by hand gets 403
+(`server.connectedAppOnly`).
+
+A token that answers 401 is gone: its household was deleted, the person left
+it or was removed from it, or they deleted the token. Joining another
+household by invite also deletes an empty household the person was alone in,
+with its tokens.
+
 ### Being told about changes
 
 With a token from connecting, `PUT /api/hook` with `{"url": "…"}` asks
@@ -70,6 +102,11 @@ It carries no data: read the change feed when it comes. Changes made with your
 own token don't ping you, bursts of changes are gathered into one ping, and
 pings aren't retried, so keep reading the feed now and then as well.
 `DELETE /api/hook` stops them.
+
+When the person creates a household, joins one or restores one from a
+backup, every hook of theirs gets
+`{"event": "households", "household": <id of the new one>, "at": "<time>"}`,
+whichever household its token is for, so your app can offer to connect it.
 
 ## Things
 
