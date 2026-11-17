@@ -122,6 +122,7 @@ A household is a set of places and things shared by the people in it: everyone i
 - Everyone starts in a household of their own. Its owner invites others with **Settings → Household → Invite someone**; anyone who can sign in to this Wherehouse and opens the link within 7 days joins.
 - You can be in several households, such as home and a cottage, or your parents' home. Switch between them next to the logo, where **New household** makes another.
 - The household's name and its default currency are under **Settings → Household**.
+- **Settings → Household → Delete the household** deletes it with every place, thing, photo, document and label in it, after asking. Only a household with nobody else in it can be deleted: remove the others first, or leave it to them. The last person to leave a household deletes it too.
 
 ## Export and backups
 
