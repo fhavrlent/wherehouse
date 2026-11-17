@@ -120,7 +120,10 @@ func TestKindsAndIcons(t *testing.T) {
 func TestHouseholdsWithToken(t *testing.T) {
 	h, c := newTestServer(t)
 	created := decodeAs[struct{ Token string }](t, mustCall(t, h, c, "POST", "/api/tokens", `{"name":"App"}`, 201))
-	mustCall(t, h, c, "POST", "/api/households", `{"name":"Cottage","currency":"EUR"}`, 201)
+	// The new household comes back, so the browser has JSON to read.
+	if id := decodeAs[struct{ ID int64 }](t, mustCall(t, h, c, "POST", "/api/households", `{"name":"Cottage","currency":"EUR"}`, 201)).ID; id == 0 {
+		t.Fatal("no id for the new household")
+	}
 	if got := decodeAs[householdsResponse](t, mustCall(t, h, c, "GET", "/api/households", "", 200)); len(got.Households) != 2 {
 		t.Fatalf("signed in: %d households", len(got.Households))
 	}

@@ -418,7 +418,7 @@ export const api = {
 
   households: () => request<{ current: number; households: Household[] }>("GET", "/api/households"),
   createHousehold: (name: string, currency: string) =>
-    request<undefined>("POST", "/api/households", { name, currency }),
+    request<{ id: number }>("POST", "/api/households", { name, currency }),
   switchHousehold: (id: number) => request<undefined>("POST", `/api/households/${id}/switch`),
   /** Makes a new household from a backup made with export.zip, and switches to it. */
   restore: (backup: File) => request<RestoreResult>("POST", "/api/restore", backup),

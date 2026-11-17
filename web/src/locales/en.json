@@ -126,7 +126,17 @@
       "leave": "Leave the household",
       "remove": "Remove from the household",
       "invite": "Invite someone",
-      "inviteHint": "Anyone who can sign in here and opens this link within 7 days joins the household."
+      "inviteHint": "Anyone who can sign in here and opens this link within 7 days joins the household.",
+      "leaveTitle": "Leave “{{name}}”?",
+      "leaveBody": "You’ll no longer see its places and things. An owner can invite you again.",
+      "leaveConfirm": "Leave",
+      "removeTitle": "Remove {{person}}?",
+      "removeBody": "They’ll no longer see the places and things of “{{name}}”, and their API tokens for it stop working.",
+      "removeConfirm": "Remove",
+      "delete": "Delete the household",
+      "deleteTitle": "Delete “{{name}}”?",
+      "deleteBody": "Every place, thing, photo, document and label in it is deleted, and can’t be brought back. Export it first to keep a copy. Documents in Paperless stay there.",
+      "deleteHint": "Only a household with nobody else in it can be deleted."
     },
     "kinds": {
       "title": "Kinds",

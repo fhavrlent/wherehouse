@@ -38,13 +38,13 @@ const Avatar = ({ name, picture }: { name: string; picture?: string }) => {
     <img
       src={picture}
       alt=""
-      className="size-8 rounded-full object-cover"
+      className="size-8 shrink-0 rounded-full object-cover"
       onError={() => {
         setFailed(picture);
       }}
     />
   ) : (
-    <span className="flex size-8 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary">
+    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary">
       {initials || "?"}
     </span>
   );
@@ -111,20 +111,20 @@ const Shell = ({ children }: { children: ReactNode }) => {
     <div className="min-h-dvh">
       <header className="sticky top-0 z-30 border-b border-border bg-bg/80 backdrop-blur-lg print:hidden">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <Link to="/" className="flex rounded-lg">
               <Logo />
             </Link>
             <HouseholdSwitcher />
           </div>
-          <nav className="hidden items-center gap-1 lg:flex">
+          <nav className="hidden shrink-0 items-center gap-1 lg:flex">
             {nav("/", t("nav.things"))}
             {nav("/report", t("nav.report"))}
             {nav("/labels", t("nav.labels"))}
             {nav("/settings", t("nav.settings"))}
           </nav>
-          <SearchBox className="ml-auto hidden w-full max-w-sm md:block" />
-          <div className="ml-auto flex items-center gap-3 md:ml-0">
+          <SearchBox className="ml-auto hidden w-full max-w-sm min-w-0 md:block" />
+          <div className="ml-auto flex shrink-0 items-center gap-3 md:ml-0">
             <Link
               to="/scan"
               aria-label={t("nav.scan")}
@@ -139,7 +139,7 @@ const Shell = ({ children }: { children: ReactNode }) => {
               <MenuTrigger asChild>
                 <button
                   type="button"
-                  className="cursor-pointer rounded-full ring-offset-2 ring-offset-bg hover:ring-2 hover:ring-border-strong"
+                  className="shrink-0 cursor-pointer rounded-full ring-offset-2 ring-offset-bg hover:ring-2 hover:ring-border-strong"
                   aria-label={t("account.menu")}
                 >
                   <Avatar name={me?.name || me?.email || ""} picture={me?.picture} />
