@@ -69,8 +69,12 @@ at the host of `redirect_uri`) is already connected to are shown as connected.
 ```
 
 Each token works like one from a single connection, with its own change feed
-and hook. Connecting a household again replaces the app's earlier token for
-it.
+and hook.
+
+Connecting a household again, with or without `multiple`, replaces your app's
+earlier token for it (the same `app` name at the same host), so use it when
+your app has lost a token. On the page, a household already connected can be
+ticked only when your link names it in `&household=<id>`.
 
 `GET /api/connect/households`, with any of your app's tokens, lists the
 person's households: `[{"id", "name", "members", "connected"}]`, `connected`

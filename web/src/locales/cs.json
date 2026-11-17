@@ -239,7 +239,6 @@
     "homeboxToken": "HomeBox odmítl API klíč",
     "importRunning": "Import už běží",
     "tokenName": "Pojmenujte token, třeba podle aplikace, která ho použije",
-    "tooManyTokens": "Nejvýš {{max}} tokenů",
     "linkUrl": "Odkazy musí být webové adresy začínající http:// nebo https://",
     "tooManyLinks": "Nejvýš {{max}} odkazů",
     "ownerOnly": "To můžou jen vlastníci domácnosti",
@@ -666,7 +665,8 @@
     "members_few": "{{count}} lidé",
     "members_many": "{{count}} lidí",
     "members_other": "{{count}} lidí",
-    "allConnected": "{{app}} už je připojená ke všem vašim domácnostem."
+    "allConnected": "{{app}} už je připojená ke všem vašim domácnostem.",
+    "reconnect": "Připojeno; povolením se připojí znovu"
   },
   "document": {
     "title": "Dokument {{id}} v Paperless",

@@ -194,23 +194,17 @@ func TestConnectSeveralHouseholds(t *testing.T) {
 	mustCall(t, h, c, "POST", "/api/connect", fmt.Sprintf(bad, `[999]`), http.StatusNotFound)
 }
 
-// Tokens for several households are made all or none: over the limit, the
-// app gets nothing, and nothing it never got is left behind.
-func TestConnectSeveralHouseholdsAllOrNone(t *testing.T) {
+// Connecting the same household again, e.g. after the app lost its token,
+// replaces the old token, so tokens don't pile up.
+func TestConnectAgainReplaces(t *testing.T) {
 	h, c := newTestServer(t)
-	const redirect = "https://warranty.example.com/wherehouse/callback"
-	home := decodeAs[householdsResponse](t, mustCall(t, h, c, "GET", "/api/households", "", 200)).Current
-	cottage := decodeAs[struct{ ID int64 }](t, mustCall(t, h, c, "POST", "/api/households", `{"name":"Cottage","currency":"EUR"}`, 201)).ID
-	for i := 0; i < store.MaxTokens-1; i++ {
-		mustCall(t, h, c, "POST", "/api/tokens", `{"name":"Script"}`, 201)
-	}
-	res := decodeAs[map[string]string](t, mustCall(t, h, c, "POST", "/api/connect",
-		`{"app":"Warranteed","redirectUri":"`+redirect+`","state":"s","codeChallenge":"`+challengeOf(testVerifier)+
-			`","multiple":true,"households":[`+itoa(home)+`,`+itoa(cottage)+`]}`, 200))
-	u, _ := url.Parse(res["redirect"])
-	mustCall(t, h, nil, "POST", "/connect/token", `{"code":"`+u.Query().Get("code")+`","redirect_uri":"`+redirect+
-		`","code_verifier":"`+testVerifier+`"}`, http.StatusBadRequest)
-	if n := len(decodeAs[[]store.Token](t, mustCall(t, h, c, "GET", "/api/tokens", "", 200))); n != store.MaxTokens-1 {
-		t.Errorf("tokens after a failed exchange = %d", n)
+	hh := decodeAs[householdsResponse](t, mustCall(t, h, c, "GET", "/api/households", "", 200)).Current
+	first := connectApp(t, h, c, hh, "https://warranty.example.com/cb")
+	other := connectApp(t, h, c, hh, "https://elsewhere.example.com/cb")
+	second := connectApp(t, h, c, hh, "https://warranty.example.com/cb")
+	for tok, want := range map[string]int{first: http.StatusUnauthorized, other: 200, second: 200} {
+		if rec := callWithToken(h, "GET", "/api/me", "", tok); rec.Code != want {
+			t.Errorf("token = %d, want %d", rec.Code, want)
+		}
 	}
 }

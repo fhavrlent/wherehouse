@@ -18,9 +18,6 @@ import (
 // TokenPrefix starts every API token, so they are easy to recognise.
 const TokenPrefix = "wherehouse_"
 
-// MaxTokens is the most API tokens one person can have.
-const MaxTokens = 20
-
 type Token struct {
 	ID int64 `json:"id"`
 	// Household is the household the token works in.
@@ -57,13 +54,6 @@ func createToken(ctx context.Context, tx *sql.Tx, userID, hh int64, name string)
 	rand.Read(b)
 	raw := TokenPrefix + hex.EncodeToString(b)
 	t := &Token{Household: hh, Name: name, CreatedAt: now()}
-	var count int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM api_tokens WHERE user_id = ?`, userID).Scan(&count); err != nil {
-		return "", nil, err
-	}
-	if count >= MaxTokens {
-		return "", nil, invalid("tooManyTokens", i18n.Args{"max": MaxTokens})
-	}
 	res, err := tx.ExecContext(ctx, `INSERT INTO api_tokens (user_id, household_id, name, token_hash, created_at) VALUES (?, ?, ?, ?, ?)`,
 		userID, hh, name, hashToken(raw), t.CreatedAt)
 	if err != nil {

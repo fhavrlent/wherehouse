@@ -231,7 +231,6 @@
     "homeboxToken": "HomeBox rejected the API key",
     "importRunning": "An import is already running",
     "tokenName": "Give the token a name, e.g. the app that uses it",
-    "tooManyTokens": "At most {{max}} tokens",
     "linkUrl": "Links must be web addresses starting with http:// or https://",
     "tooManyLinks": "At most {{max}} links",
     "ownerOnly": "Only the household’s owners can do that",
@@ -622,7 +621,8 @@
     "connected": "Connected",
     "members_one": "Only you",
     "members_other": "{{count}} people",
-    "allConnected": "{{app}} is connected to all your households already."
+    "allConnected": "{{app}} is connected to all your households already.",
+    "reconnect": "Connected; allowing connects it again"
   },
   "document": {
     "title": "Paperless document {{id}}",

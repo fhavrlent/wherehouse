@@ -45,7 +45,9 @@ export const Connect = () => {
     );
   }
   const chosen = household || preselect || (data?.current ?? 0);
-  const open = (many.data ?? []).filter((h) => !h.connected);
+  // A connected household can be ticked only when the app names it, to
+  // reconnect it after losing its token; allowing replaces the old token.
+  const open = (many.data ?? []).filter((h) => !h.connected || h.id === preselect);
   // Until the person ticks something: the household asked for, else the
   // current one, if the app isn't connected to it yet.
   // A household connected meanwhile, e.g. in another tab, drops out.
@@ -89,21 +91,25 @@ export const Connect = () => {
                 key={h.id}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 text-sm",
-                  h.connected ? "text-fg-muted" : "cursor-pointer hover:bg-surface-2",
+                  open.some((o) => o.id === h.id) ? "cursor-pointer hover:bg-surface-2" : "text-fg-muted",
                 )}
               >
                 <input
                   type="checkbox"
                   className="size-4 accent-primary"
-                  checked={h.connected || picked.includes(h.id)}
-                  disabled={h.connected}
+                  checked={picked.includes(h.id) || (h.connected && h.id !== preselect)}
+                  disabled={!open.some((o) => o.id === h.id)}
                   onChange={() => toggle(h.id)}
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{h.name}</span>
                   <span className="block text-xs text-fg-subtle">{t("connect.members", { count: h.members })}</span>
                 </span>
-                {h.connected && <span className="text-xs">{t("connect.connected")}</span>}
+                {h.connected && (
+                  <span className="text-right text-xs">
+                    {t(h.id === preselect ? "connect.reconnect" : "connect.connected")}
+                  </span>
+                )}
               </label>
             ))}
           </div>
