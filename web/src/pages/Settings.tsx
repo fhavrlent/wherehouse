@@ -17,6 +17,7 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { Card, Segmented } from "@/components/ui/misc";
 import { browserLanguage, LANGUAGES } from "@/i18n";
@@ -539,9 +540,14 @@ const HouseholdSection = () => {
   const qc = useQueryClient();
   const { data: h } = useHousehold();
   const { data: me } = useMe();
+  const navigate = useNavigate();
   const [invite, setInvite] = useState<string | null>(null);
+  // Who is to leave or be removed, waiting for a yes.
+  const [removing, setRemoving] = useState<{ userId: number; name: string } | null>(null);
   if (!h) return null;
   const owner = h.role === "owner";
+  const alone = h.members.length === 1;
+  const self = removing?.userId === me?.id;
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: keys.household });
     void qc.invalidateQueries({ queryKey: keys.households });
@@ -610,12 +616,7 @@ const HouseholdSection = () => {
                   variant="ghost"
                   size="icon-sm"
                   aria-label={m.userId === me?.id ? t("settings.household.leave") : t("settings.household.remove")}
-                  onClick={() =>
-                    run(async () => {
-                      await api.removeMember(m.userId);
-                      if (m.userId === me?.id) await qc.invalidateQueries();
-                    })
-                  }
+                  onClick={() => setRemoving({ userId: m.userId, name: m.name || m.email })}
                 >
                   <Trash2 />
                 </Button>
@@ -624,6 +625,39 @@ const HouseholdSection = () => {
           ))}
         </ul>
       </Field>
+      <ConfirmDialog
+        open={removing !== null}
+        onOpenChange={(o) => !o && setRemoving(null)}
+        title={
+          self
+            ? t(alone ? "settings.household.deleteTitle" : "settings.household.leaveTitle", { name: h.name })
+            : t("settings.household.removeTitle", { person: removing?.name })
+        }
+        description={
+          self
+            ? t(alone ? "settings.household.deleteBody" : "settings.household.leaveBody")
+            : t("settings.household.removeBody", { name: h.name })
+        }
+        confirmLabel={
+          self
+            ? alone
+              ? t("common.delete")
+              : t("settings.household.leaveConfirm")
+            : t("settings.household.removeConfirm")
+        }
+        onConfirm={() => {
+          const who = removing;
+          setRemoving(null);
+          if (!who) return;
+          void run(async () => {
+            await api.removeMember(who.userId);
+            if (who.userId === me?.id) {
+              await qc.invalidateQueries();
+              void navigate("/");
+            }
+          });
+        }}
+      />
       {owner && (
         <div className="flex flex-col gap-2">
           <Button
@@ -660,6 +694,19 @@ const HouseholdSection = () => {
               <p className="text-xs text-fg-subtle">{t("settings.household.inviteHint")}</p>
             </div>
           )}
+        </div>
+      )}
+      {owner && me && (
+        <div className="flex flex-col gap-1.5 border-t border-border pt-4">
+          <Button
+            variant="outline"
+            className="w-fit text-bad"
+            disabled={!alone}
+            onClick={() => setRemoving({ userId: me.id, name: me.name || me.email })}
+          >
+            <Trash2 /> {t("settings.household.delete")}
+          </Button>
+          {!alone && <p className="text-xs text-fg-subtle">{t("settings.household.deleteHint")}</p>}
         </div>
       )}
     </Section>

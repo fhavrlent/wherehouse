@@ -34,11 +34,12 @@ func (s *Server) createHousehold(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if _, err := s.store.CreateHousehold(r.Context(), userID(r), in.Name, in.Currency); err != nil {
+	id, err := s.store.CreateHousehold(r.Context(), userID(r), in.Name, in.Currency)
+	if err != nil {
 		fail(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusCreated)
+	writeJSON(w, http.StatusCreated, map[string]int64{"id": id})
 }
 
 func (s *Server) switchHousehold(w http.ResponseWriter, r *http.Request) {

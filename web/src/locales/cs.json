@@ -130,7 +130,17 @@
       "leave": "Odejít z domácnosti",
       "remove": "Odebrat z domácnosti",
       "invite": "Pozvat někoho",
-      "inviteHint": "Kdo se tu umí přihlásit a otevře odkaz do 7 dní, přidá se do domácnosti."
+      "inviteHint": "Kdo se tu umí přihlásit a otevře odkaz do 7 dní, přidá se do domácnosti.",
+      "leaveTitle": "Odejít z „{{name}}“?",
+      "leaveBody": "Přestanete vidět její místa a věci. Vlastník vás může pozvat znovu.",
+      "leaveConfirm": "Odejít",
+      "removeTitle": "Odebrat {{person}}?",
+      "removeBody": "Přestane vidět místa a věci domácnosti „{{name}}“ a API tokeny, které pro ni má, přestanou fungovat.",
+      "removeConfirm": "Odebrat",
+      "delete": "Smazat domácnost",
+      "deleteTitle": "Smazat „{{name}}“?",
+      "deleteBody": "Smažou se všechna místa, věci, fotky, dokumenty a štítky v ní a nepůjde je vrátit. Pokud si chcete nechat kopii, nejdřív ji exportujte. Dokumenty v Paperless tam zůstanou.",
+      "deleteHint": "Smazat jde jen domácnost, ve které nikdo jiný není."
     },
     "kinds": {
       "title": "Druhy",
