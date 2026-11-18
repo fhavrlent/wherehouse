@@ -34,6 +34,10 @@ type Server struct {
 	thumbSlots chan struct{}
 	// connect holds codes other apps swap for API tokens.
 	connect connectCodes
+	// docLocks has a mutex per Paperless document whose link back is being
+	// updated, and backlinks tracks those updates running in the background.
+	docLocks  sync.Map
+	backlinks sync.WaitGroup
 	// hooks pings connected apps when something changes.
 	hooks *hooks
 	// importer is the last HomeBox import started, if any.
@@ -89,6 +93,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /api/things", s.listThings)
 	api.HandleFunc("POST /api/things", s.createThing)
 	api.HandleFunc("GET /api/things/{id}", s.getThing)
+	api.HandleFunc("GET /api/things/{id}/household", sessionOnly(s.thingHousehold))
 	api.HandleFunc("PUT /api/things/{id}", s.updateThing)
 	api.HandleFunc("PATCH /api/things/{id}", s.patchThing)
 	api.HandleFunc("DELETE /api/things/{id}", s.deleteThing)
@@ -130,6 +135,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("DELETE /api/attachments/{id}", s.deleteAttachment)
 	api.HandleFunc("GET /api/paperless", s.paperlessInfo)
 	api.HandleFunc("GET /api/paperless/search", s.searchPaperless)
+	api.HandleFunc("POST /api/paperless/links", sessionOnly(s.syncAllBacklinks))
 	api.HandleFunc("GET /api/paperless/documents/{doc}/things", s.documentThings)
 
 	api.HandleFunc("GET /api/maintenance/due", s.dueMaintenance)

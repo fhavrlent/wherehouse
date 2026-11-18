@@ -155,43 +155,8 @@ func (s *Server) linkPaperless(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, a)
 	}
-	if st, err := s.store.Settings(r.Context(), uid); err == nil && st.PaperlessBacklinks {
-		for _, id := range in.DocumentIDs {
-			go s.linkBack(pc, id)
-		}
-	}
+	s.syncBacklinksLater(uid, in.DocumentIDs...)
 	writeJSON(w, http.StatusCreated, out)
-}
-
-// linkBack fills the document's Wherehouse URL field with the page of the
-// things it is on, unless someone put something else there. The page lists
-// whatever the document is on at the time, so the link never needs
-// changing.
-func (s *Server) linkBack(pc *paperless.Client, doc int64) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	want := fmt.Sprintf("%s/d/%d", strings.TrimSuffix(s.cfg.AppURL.String(), "/"), doc)
-	field, err := pc.CustomFieldID(ctx, s.cfg.Paperless.Field, "url", true)
-	if err != nil {
-		slog.Warn("paperless link back: field", "doc", doc, "err", err)
-		return
-	}
-	fields, err := pc.DocumentCustomFields(ctx, doc)
-	if err != nil {
-		slog.Warn("paperless link back: read", "doc", doc, "err", err)
-		return
-	}
-	for _, f := range fields {
-		if f.Field == field {
-			if v, _ := f.Value.(string); v != "" {
-				return
-			}
-		}
-	}
-	fields = append(fields, paperless.CustomField{Field: field, Value: want})
-	if err := pc.SetDocumentCustomFields(ctx, doc, fields); err != nil {
-		slog.Warn("paperless link back: write", "doc", doc, "err", err)
-	}
 }
 
 // documentThings lists the things a Paperless document is on, for the
@@ -345,6 +310,9 @@ func (s *Server) deleteAttachment(w http.ResponseWriter, r *http.Request) {
 	}
 	if a.File != "" {
 		s.files.Remove(a.File)
+	}
+	if a.PaperlessDocID != nil {
+		s.syncBacklinksLater(userID(r), *a.PaperlessDocID)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -178,12 +178,19 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 	if uid != userID(r) && !s.owner(w, r) {
 		return
 	}
+	// The last one out deletes the household and its things.
+	docs, err := s.store.HouseholdDocuments(r.Context(), household(r))
+	if err != nil {
+		fail(w, err)
+		return
+	}
 	files, err := s.store.RemoveMember(r.Context(), household(r), uid)
 	if err != nil {
 		fail(w, err)
 		return
 	}
 	s.files.Remove(files...)
+	s.syncBacklinksLater(userID(r), docs...)
 	w.WriteHeader(http.StatusNoContent)
 }
 

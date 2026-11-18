@@ -419,6 +419,13 @@ export const api = {
   households: () => request<{ current: number; households: Household[] }>("GET", "/api/households"),
   createHousehold: (name: string, currency: string) =>
     request<{ id: number }>("POST", "/api/households", { name, currency }),
+  /** Fills in links back from Paperless on the documents the person linked. */
+  syncPaperlessLinks: () =>
+    request<{
+      documents: number;
+      failed: number;
+      error?: { error: string; code?: string; params?: Record<string, unknown> };
+    }>("POST", "/api/paperless/links"),
   switchHousehold: (id: number) => request<undefined>("POST", `/api/households/${id}/switch`),
   /** Makes a new household from a backup made with export.zip, and switches to it. */
   restore: (backup: File) => request<RestoreResult>("POST", "/api/restore", backup),
@@ -460,6 +467,8 @@ export const api = {
     return request<Thing[]>("GET", `/api/things?${q.toString()}`);
   },
   thing: (id: number) => request<ThingDetail>("GET", `/api/things/${id}`),
+  /** The other of the person's households a thing is in. */
+  thingHousehold: (id: number) => request<Household>("GET", `/api/things/${id}/household`),
   createThing: (t: ThingInput) => request<Thing>("POST", "/api/things", t),
   updateThing: (id: number, t: ThingInput) => request<Thing>("PUT", `/api/things/${id}`, t),
   deleteThing: (id: number) => request<undefined>("DELETE", `/api/things/${id}`),

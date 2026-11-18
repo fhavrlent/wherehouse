@@ -69,6 +69,11 @@ func (s *Server) restoreZip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	go s.hooks.households(userID(r), res.HouseholdID)
+	// Documents also on things of the household the backup was made of now
+	// link to both.
+	if docs, err := s.store.HouseholdDocuments(ctx, res.HouseholdID); err == nil {
+		s.syncBacklinksLater(userID(r), docs...)
+	}
 	writeJSON(w, http.StatusCreated, res)
 }
 

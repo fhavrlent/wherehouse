@@ -212,9 +212,37 @@ func (s *Server) archiveThing(archived bool) http.HandlerFunc {
 	}
 }
 
+// thingHousehold says which other of the person's households a thing is
+// in, so a link to it, e.g. from Paperless, can offer to switch there.
+func (s *Server) thingHousehold(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	hh, err := s.store.ThingHousehold(r.Context(), id)
+	if err == nil {
+		_, err = s.store.Role(r.Context(), hh, userID(r))
+	}
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	h, err := s.store.GetHousehold(r.Context(), hh)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, 200, h)
+}
+
 func (s *Server) deleteThing(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
+		return
+	}
+	docs, err := s.store.ThingDocuments(r.Context(), household(r), id)
+	if err != nil {
+		fail(w, err)
 		return
 	}
 	files, err := s.store.DeleteThing(r.Context(), household(r), id)
@@ -223,6 +251,7 @@ func (s *Server) deleteThing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.files.Remove(files...)
+	s.syncBacklinksLater(userID(r), docs...)
 	w.WriteHeader(http.StatusNoContent)
 }
 

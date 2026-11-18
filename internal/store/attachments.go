@@ -163,3 +163,64 @@ func (s *Store) ThingsWithDocument(ctx context.Context, hh, doc int64) ([]Thing,
 	return s.queryThings(ctx, t, `SELECT `+thingColumns+thingFrom+` WHERE t.household_id = ? AND t.id IN
 		(SELECT thing_id FROM attachments WHERE paperless_doc_id = ?) ORDER BY t.name COLLATE NOCASE`, hh, doc)
 }
+
+// DocumentThingIDs lists the things in any household a Paperless document
+// is linked to, for the link back in Paperless.
+func (s *Store) DocumentThingIDs(ctx context.Context, doc int64) ([]int64, error) {
+	return s.ids(ctx, `SELECT DISTINCT thing_id FROM attachments WHERE paperless_doc_id = ? ORDER BY thing_id`, doc)
+}
+
+// DocumentLinkers lists who linked a Paperless document to a thing.
+func (s *Store) DocumentLinkers(ctx context.Context, doc int64) ([]int64, error) {
+	return s.ids(ctx, `SELECT DISTINCT added_by FROM attachments WHERE paperless_doc_id = ? AND added_by IS NOT NULL ORDER BY added_by`, doc)
+}
+
+// LinkedDocuments lists the Paperless documents a person linked to things.
+func (s *Store) LinkedDocuments(ctx context.Context, uid int64) ([]int64, error) {
+	return s.ids(ctx, `SELECT DISTINCT paperless_doc_id FROM attachments WHERE added_by = ? AND paperless_doc_id IS NOT NULL ORDER BY paperless_doc_id`, uid)
+}
+
+// ThingDocuments lists the Paperless documents linked to a thing.
+func (s *Store) ThingDocuments(ctx context.Context, hh, thing int64) ([]int64, error) {
+	return s.ids(ctx, `SELECT DISTINCT a.paperless_doc_id FROM attachments a JOIN things t ON t.id = a.thing_id
+		WHERE t.household_id = ? AND a.thing_id = ? AND a.paperless_doc_id IS NOT NULL`, hh, thing)
+}
+
+// HouseholdDocuments lists the Paperless documents linked to a household's
+// things.
+func (s *Store) HouseholdDocuments(ctx context.Context, hh int64) ([]int64, error) {
+	return s.ids(ctx, `SELECT DISTINCT a.paperless_doc_id FROM attachments a JOIN things t ON t.id = a.thing_id
+		WHERE t.household_id = ? AND a.paperless_doc_id IS NOT NULL`, hh)
+}
+
+// BacklinkUsers lists the people who turned on links back from Paperless.
+func (s *Store) BacklinkUsers(ctx context.Context) ([]int64, error) {
+	return s.ids(ctx, `SELECT user_id FROM user_settings WHERE paperless_backlinks = 1 ORDER BY user_id`)
+}
+
+// ThingHousehold is the household a thing is in.
+func (s *Store) ThingHousehold(ctx context.Context, id int64) (int64, error) {
+	var hh int64
+	err := s.db.QueryRowContext(ctx, `SELECT household_id FROM things WHERE id = ?`, id).Scan(&hh)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	return hh, err
+}
+
+func (s *Store) ids(ctx context.Context, query string, args ...any) ([]int64, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
