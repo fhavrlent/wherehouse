@@ -24,19 +24,60 @@ import (
 // didn't write, such as one someone typed in, is left alone.
 //
 // The field is written with the Paperless connection of someone who turned
-// links on: uid, who changed something, if they did, else whoever linked
-// the document, else anyone, so a link written earlier still gets corrected.
-func (s *Server) syncBacklink(ctx context.Context, uid, doc int64) error {
+// links on: uid, who changed something, and when borrow is set and
+// Paperless refuses them, whoever linked the document, then whoever wrote
+// its link, so a link to a thing that is gone still gets corrected. Only
+// those have shown they may reach the document; nobody else's connection
+// is ever used for it. Restoring a backup doesn't borrow, as its document
+// IDs come from a file.
+func (s *Server) syncBacklink(ctx context.Context, uid, doc int64, borrow bool) error {
 	// One update per document at a time, reading the latest state once it's
 	// its turn, so an older update can't finish last and win.
 	lock, _ := s.docLocks.LoadOrStore(doc, new(sync.Mutex))
 	lock.(*sync.Mutex).Lock()
 	defer lock.(*sync.Mutex).Unlock()
 
-	pc, err := s.backlinkWriter(ctx, uid, doc)
-	if err != nil || pc == nil {
+	candidates := []int64{uid}
+	if borrow {
+		linkers, err := s.store.DocumentLinkers(ctx, doc)
+		if err != nil {
+			return err
+		}
+		writer, err := s.store.BacklinkWriter(ctx, doc)
+		if err != nil {
+			return err
+		}
+		candidates = append(append(candidates, linkers...), writer...)
+	}
+	var refused error
+	tried := map[int64]bool{}
+	for _, id := range candidates {
+		if tried[id] {
+			continue
+		}
+		tried[id] = true
+		pc, err := s.backlinkClient(ctx, id)
+		if err != nil {
+			return err
+		}
+		if pc == nil {
+			continue
+		}
+		err = s.writeBacklink(ctx, pc, id, doc)
+		var pe *paperless.Error
+		if errors.As(err, &pe) && (pe.Status == http.StatusUnauthorized || pe.Status == http.StatusForbidden || pe.Status == http.StatusNotFound) {
+			// This connection may not reach or change the document; the next
+			// one may.
+			refused = err
+			continue
+		}
 		return err
 	}
+	return refused
+}
+
+// writeBacklink writes a document's link with pc, the connection of uid.
+func (s *Server) writeBacklink(ctx context.Context, pc *paperless.Client, uid, doc int64) error {
 	things, err := s.store.DocumentThingIDs(ctx, doc)
 	if err != nil {
 		return err
@@ -59,45 +100,41 @@ func (s *Server) syncBacklink(ctx context.Context, uid, doc int64) error {
 		return err
 	}
 	fields, changed := setLinkField(current, field, want, app+"/i/", app+"/d/")
-	if !changed {
-		return nil
+	if changed {
+		if err := pc.SetDocumentCustomFields(ctx, doc, fields); err != nil {
+			return err
+		}
 	}
-	return pc.SetDocumentCustomFields(ctx, doc, fields)
+	if !changed && !hasLink(current, field, app) {
+		return nil // someone else's value, or nothing to do
+	}
+	if want == "" {
+		uid = 0
+	}
+	return s.store.SetBacklinkWriter(ctx, doc, uid)
 }
 
-// backlinkWriter is the Paperless connection to write a document's link
-// with, or nil when nobody who could has links on.
-func (s *Server) backlinkWriter(ctx context.Context, uid, doc int64) (*paperless.Client, error) {
-	linkers, err := s.store.DocumentLinkers(ctx, doc)
+// hasLink reports whether field holds a link Wherehouse wrote.
+func hasLink(fields []paperless.CustomField, field int64, app string) bool {
+	for _, f := range fields {
+		if v, _ := f.Value.(string); f.Field == field && (strings.HasPrefix(v, app+"/i/") || strings.HasPrefix(v, app+"/d/")) {
+			return true
+		}
+	}
+	return false
+}
+
+// backlinkClient is uid's Paperless connection if they turned links on.
+func (s *Server) backlinkClient(ctx context.Context, uid int64) (*paperless.Client, error) {
+	st, err := s.store.Settings(ctx, uid)
+	if err != nil || !st.PaperlessBacklinks {
+		return nil, err
+	}
+	admin, err := s.store.IsAdmin(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
-	everyone, err := s.store.BacklinkUsers(ctx)
-	if err != nil {
-		return nil, err
-	}
-	tried := map[int64]bool{}
-	for _, id := range append(append([]int64{uid}, linkers...), everyone...) {
-		if tried[id] {
-			continue
-		}
-		tried[id] = true
-		st, err := s.store.Settings(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		if !st.PaperlessBacklinks {
-			continue
-		}
-		admin, err := s.store.IsAdmin(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		if pc := s.paperlessFor(st, admin); pc != nil {
-			return pc, nil
-		}
-	}
-	return nil, nil
+	return s.paperlessFor(st, admin), nil
 }
 
 // setLinkField sets field id to want, or removes it when want is empty,
@@ -134,7 +171,8 @@ func setLinkField(fields []paperless.CustomField, id int64, want string, ours ..
 
 // syncBacklinksLater updates documents' link fields in the background, so a
 // slow or refusing Paperless doesn't hold up the request that changed them.
-func (s *Server) syncBacklinksLater(uid int64, docs ...int64) {
+// borrow is as for syncBacklink.
+func (s *Server) syncBacklinksLater(uid int64, borrow bool, docs ...int64) {
 	if len(docs) == 0 || s.cfg.Paperless.URL == "" {
 		return
 	}
@@ -144,7 +182,7 @@ func (s *Server) syncBacklinksLater(uid int64, docs ...int64) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 		for _, d := range docs {
-			if err := s.syncBacklink(ctx, uid, d); err != nil {
+			if err := s.syncBacklink(ctx, uid, d, borrow); err != nil {
 				slog.Warn("update link in paperless", "doc", d, "err", err)
 			}
 		}
@@ -168,7 +206,7 @@ func (s *Server) syncAllBacklinks(w http.ResponseWriter, r *http.Request) {
 		Error     *apiError `json:"error,omitempty"`
 	}{Documents: len(docs)}
 	for _, d := range docs {
-		if err := s.syncBacklink(ctx, uid, d); err != nil {
+		if err := s.syncBacklink(ctx, uid, d, false); err != nil {
 			slog.Warn("update link in paperless", "doc", d, "err", err)
 			out.Failed++
 			if out.Error == nil {

@@ -155,7 +155,7 @@ func (s *Server) linkPaperless(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, a)
 	}
-	s.syncBacklinksLater(uid, in.DocumentIDs...)
+	s.syncBacklinksLater(uid, true, in.DocumentIDs...)
 	writeJSON(w, http.StatusCreated, out)
 }
 
@@ -312,7 +312,7 @@ func (s *Server) deleteAttachment(w http.ResponseWriter, r *http.Request) {
 		s.files.Remove(a.File)
 	}
 	if a.PaperlessDocID != nil {
-		s.syncBacklinksLater(userID(r), *a.PaperlessDocID)
+		s.syncBacklinksLater(userID(r), true, *a.PaperlessDocID)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

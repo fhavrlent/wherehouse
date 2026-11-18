@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -39,6 +40,10 @@ func (f *fakePaperless) server(t *testing.T) *httptest.Server {
 		w.Header().Set("Content-Type", "application/json")
 		var doc int64
 		fmt.Sscanf(r.URL.Path, "/api/documents/%d/", &doc)
+		if doc != 0 && r.Header.Get("Authorization") == "Token nope" {
+			http.Error(w, `{"detail":"Not found."}`, http.StatusNotFound)
+			return
+		}
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		switch {
@@ -144,6 +149,53 @@ func TestBacklinksFilledInLater(t *testing.T) {
 	}
 	if v, _ := pl.value(9); v != "https://example.com/mine" || len(pl.fields[9]) != 2 {
 		t.Errorf("someone's own link changed: %+v", pl.fields[9])
+	}
+}
+
+// Someone whose Paperless can't reach the document deletes its thing: the
+// link is removed with the connection that wrote it.
+func TestBacklinkTriesTheNextWriter(t *testing.T) {
+	pl := &fakePaperless{fields: map[int64][]paperless.CustomField{}}
+	srv := pl.server(t)
+	e := newTestEnv(t, func(c *config.Config) {
+		c.Paperless = config.Paperless{URL: srv.URL, Field: "Wherehouse"}
+	})
+	alice, bob := e.signIn(t, "alice"), e.signIn(t, "bob")
+	h := e.h
+	mustCall(t, h, alice, "PUT", "/api/settings", `{"theme":"system","notifyDays":"7","paperlessToken":"tok","paperlessBacklinks":true}`, 200)
+	mustCall(t, h, bob, "PUT", "/api/settings", `{"theme":"system","notifyDays":"7","paperlessToken":"nope","paperlessBacklinks":true}`, 200)
+	invite := decodeAs[map[string]string](t, mustCall(t, h, alice, "POST", "/api/household/invites", "", 201))
+	mustCall(t, h, bob, "POST", "/api/invites/"+invite["url"][strings.LastIndex(invite["url"], "/")+1:]+"/accept", "", 204)
+
+	tv := add(t, h, alice, `{"name":"TV"}`)
+	mustCall(t, h, alice, "POST", fmt.Sprintf("/api/things/%d/attachments/paperless", tv.ID), `{"documentIds":[7],"kind":"receipt"}`, 201)
+	eventually(t, "link written", func() bool { _, ok := pl.value(7); return ok })
+	mustCall(t, h, bob, "DELETE", fmt.Sprintf("/api/things/%d", tv.ID), "", 204)
+	eventually(t, "link removed", func() bool { _, ok := pl.value(7); return !ok })
+}
+
+// A backup names documents by ID without anyone having reached them here:
+// restoring it never borrows the connection of someone who linked them.
+func TestRestoreDoesNotBorrowConnections(t *testing.T) {
+	pl := &fakePaperless{fields: map[int64][]paperless.CustomField{}}
+	srv := pl.server(t)
+	e := newTestEnv(t, func(c *config.Config) {
+		c.Paperless = config.Paperless{URL: srv.URL, Field: "Wherehouse"}
+	})
+	alice, carol := e.signIn(t, "alice"), e.signIn(t, "carol")
+	h := e.h
+	mustCall(t, h, alice, "PUT", "/api/settings", `{"theme":"system","notifyDays":"7","paperlessToken":"tok","paperlessBacklinks":true}`, 200)
+	mustCall(t, h, carol, "PUT", "/api/settings", `{"theme":"system","notifyDays":"7","paperlessToken":"nope","paperlessBacklinks":true}`, 200)
+	tv := add(t, h, alice, `{"name":"TV"}`)
+	mustCall(t, h, alice, "POST", fmt.Sprintf("/api/things/%d/attachments/paperless", tv.ID), `{"documentIds":[7],"kind":"receipt"}`, 201)
+	want := fmt.Sprintf("http://wherehouse.test/i/%d", tv.ID)
+	eventually(t, "link written", func() bool { v, _ := pl.value(7); return v == want })
+
+	backup := mustCall(t, h, alice, "GET", "/api/export.zip", "", 200).Body.Bytes()
+	restoreBackup(t, h, carol, backup, 201)
+	time.Sleep(300 * time.Millisecond)
+	if v, _ := pl.value(7); v != want {
+		t.Errorf("link changed to %q through someone else's connection", v)
 	}
 }
 

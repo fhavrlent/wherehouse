@@ -190,7 +190,7 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.files.Remove(files...)
-	s.syncBacklinksLater(userID(r), docs...)
+	s.syncBacklinksLater(userID(r), true, docs...)
 	w.WriteHeader(http.StatusNoContent)
 }
 

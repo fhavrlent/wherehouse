@@ -193,9 +193,22 @@ func (s *Store) HouseholdDocuments(ctx context.Context, hh int64) ([]int64, erro
 		WHERE t.household_id = ? AND a.paperless_doc_id IS NOT NULL`, hh)
 }
 
-// BacklinkUsers lists the people who turned on links back from Paperless.
-func (s *Store) BacklinkUsers(ctx context.Context) ([]int64, error) {
-	return s.ids(ctx, `SELECT user_id FROM user_settings WHERE paperless_backlinks = 1 ORDER BY user_id`)
+// BacklinkWriter is who wrote the link back in a Paperless document, if
+// anyone.
+func (s *Store) BacklinkWriter(ctx context.Context, doc int64) ([]int64, error) {
+	return s.ids(ctx, `SELECT user_id FROM paperless_backlinks WHERE doc_id = ?`, doc)
+}
+
+// SetBacklinkWriter records who wrote a document's link back, or that it
+// has none when uid is 0.
+func (s *Store) SetBacklinkWriter(ctx context.Context, doc, uid int64) error {
+	if uid == 0 {
+		_, err := s.db.ExecContext(ctx, `DELETE FROM paperless_backlinks WHERE doc_id = ?`, doc)
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO paperless_backlinks (doc_id, user_id) VALUES (?, ?)
+		ON CONFLICT (doc_id) DO UPDATE SET user_id = excluded.user_id`, doc, uid)
+	return err
 }
 
 // ThingHousehold is the household a thing is in.

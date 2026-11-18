@@ -67,7 +67,7 @@ func (s *Server) importHomeBox(w http.ResponseWriter, r *http.Request) {
 			slog.Error("homebox import failed", "err", err)
 		}
 		if docs, err := s.store.HouseholdDocuments(ctx, hh); err == nil {
-			s.syncBacklinksLater(uid, docs...)
+			s.syncBacklinksLater(uid, false, docs...)
 		}
 	}()
 	writeJSON(w, http.StatusAccepted, im.Progress())
