@@ -251,7 +251,7 @@ func (s *Server) deleteThing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.files.Remove(files...)
-	s.syncBacklinksLater(userID(r), true, docs...)
+	s.syncBacklinksLater(actorOf(r), true, docs...)
 	w.WriteHeader(http.StatusNoContent)
 }
 

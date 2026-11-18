@@ -56,7 +56,7 @@ func (s *Server) importHomeBox(w http.ResponseWriter, r *http.Request) {
 		writeMsg(w, http.StatusConflict, "server.importRunning", nil)
 		return
 	}
-	uid, hh := userID(r), household(r)
+	uid, hh, by := userID(r), household(r), actorOf(r)
 	im := importer.New(s.store, hb, s.files, hh, uid)
 	im.PaperlessURLs = []string{s.cfg.Paperless.URL, s.cfg.Paperless.PublicURL}
 	s.importer = im
@@ -67,7 +67,7 @@ func (s *Server) importHomeBox(w http.ResponseWriter, r *http.Request) {
 			slog.Error("homebox import failed", "err", err)
 		}
 		if docs, err := s.store.HouseholdDocuments(ctx, hh); err == nil {
-			s.syncBacklinksLater(uid, false, docs...)
+			s.syncBacklinksLater(by, false, docs...)
 		}
 	}()
 	writeJSON(w, http.StatusAccepted, im.Progress())

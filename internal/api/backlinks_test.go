@@ -1,11 +1,13 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -18,9 +20,17 @@ import (
 
 // fakePaperless keeps documents' custom field values, with field 3 being
 // the Wherehouse URL field and field 4 another one.
+// Token "nope" reaches no document and token "ro" may only read them.
 type fakePaperless struct {
 	mu     sync.Mutex
 	fields map[int64][]paperless.CustomField
+	tokens []string // the Authorization header of every request
+}
+
+func (f *fakePaperless) used(auth string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Contains(f.tokens, auth)
 }
 
 func (f *fakePaperless) value(doc int64) (string, bool) {
@@ -40,12 +50,17 @@ func (f *fakePaperless) server(t *testing.T) *httptest.Server {
 		w.Header().Set("Content-Type", "application/json")
 		var doc int64
 		fmt.Sscanf(r.URL.Path, "/api/documents/%d/", &doc)
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		f.tokens = append(f.tokens, r.Header.Get("Authorization"))
 		if doc != 0 && r.Header.Get("Authorization") == "Token nope" {
 			http.Error(w, `{"detail":"Not found."}`, http.StatusNotFound)
 			return
 		}
-		f.mu.Lock()
-		defer f.mu.Unlock()
+		if doc != 0 && r.Method == "PATCH" && r.Header.Get("Authorization") == "Token ro" {
+			http.Error(w, `{"detail":"You do not have permission."}`, http.StatusForbidden)
+			return
+		}
 		switch {
 		case r.URL.Path == "/api/custom_fields/":
 			w.Write([]byte(`{"results":[{"id":3,"name":"Wherehouse","data_type":"url"}]}`))
@@ -218,4 +233,75 @@ func TestThingOfAnotherHousehold(t *testing.T) {
 	// Someone else learns nothing.
 	other := e.signIn(t, "b")
 	mustCall(t, h, other, "GET", fmt.Sprintf("/api/things/%d/household", tv.ID), "", 404)
+}
+
+// Someone whose token may only read links a document whose link is
+// already right: whoever wrote it stays the one to correct it later.
+func TestBacklinkWriterKeptWithoutWrite(t *testing.T) {
+	pl := &fakePaperless{fields: map[int64][]paperless.CustomField{}}
+	srv := pl.server(t)
+	e := newTestEnv(t, func(c *config.Config) {
+		c.Paperless = config.Paperless{URL: srv.URL, Field: "Wherehouse"}
+	})
+	alice, bob := e.signIn(t, "alice"), e.signIn(t, "bob")
+	h := e.h
+	mustCall(t, h, alice, "PUT", "/api/settings", `{"theme":"system","notifyDays":"7","paperlessToken":"tok","paperlessBacklinks":true}`, 200)
+	mustCall(t, h, bob, "PUT", "/api/settings", `{"theme":"system","notifyDays":"7","paperlessToken":"ro","paperlessBacklinks":true}`, 200)
+	invite := decodeAs[map[string]string](t, mustCall(t, h, alice, "POST", "/api/household/invites", "", 201))
+	mustCall(t, h, bob, "POST", "/api/invites/"+invite["url"][strings.LastIndex(invite["url"], "/")+1:]+"/accept", "", 204)
+	is := func(want string) func() bool {
+		return func() bool { v, _ := pl.value(7); return v == want }
+	}
+	link := func(c *http.Cookie, id int64) {
+		mustCall(t, h, c, "POST", fmt.Sprintf("/api/things/%d/attachments/paperless", id), `{"documentIds":[7],"kind":"receipt"}`, 201)
+	}
+
+	tv, radio, lamp := add(t, h, alice, `{"name":"TV"}`), add(t, h, alice, `{"name":"Radio"}`), add(t, h, alice, `{"name":"Lamp"}`)
+	link(alice, tv.ID)
+	link(alice, radio.ID)
+	eventually(t, "link to the list", is("http://wherehouse.test/d/7"))
+	link(bob, lamp.ID)
+	time.Sleep(200 * time.Millisecond)
+	for _, id := range []int64{tv.ID, radio.ID} {
+		th := decodeAs[store.Thing](t, mustCall(t, h, bob, "GET", fmt.Sprintf("/api/things/%d", id), "", 200))
+		mustCall(t, h, bob, "DELETE", fmt.Sprintf("/api/attachments/%d", th.Attachments[0].ID), "", 204)
+	}
+	eventually(t, "link to the lamp", is(fmt.Sprintf("http://wherehouse.test/i/%d", lamp.ID)))
+}
+
+// A change made with an API token never updates links with the server's
+// own Paperless token, as nothing else done with an API token does.
+func TestBacklinkNeverServerTokenForAPIToken(t *testing.T) {
+	pl := &fakePaperless{fields: map[int64][]paperless.CustomField{}}
+	srv := pl.server(t)
+	e := newTestEnv(t, func(c *config.Config) {
+		c.Paperless = config.Paperless{URL: srv.URL, Field: "Wherehouse", Token: "server-token"}
+	})
+	c := e.signIn(t, "admin")
+	h := e.h
+	me := decodeAs[store.User](t, mustCall(t, h, c, "GET", "/api/me", "", 200))
+	if err := e.st.SetAdmin(context.Background(), me.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	mustCall(t, h, c, "PUT", "/api/settings", `{"theme":"system","notifyDays":"7","paperlessBacklinks":true}`, 200)
+	tv := add(t, h, c, `{"name":"TV"}`)
+	mustCall(t, h, c, "POST", fmt.Sprintf("/api/things/%d/attachments/paperless", tv.ID), `{"documentIds":[7],"kind":"receipt"}`, 201)
+	eventually(t, "link written with the server token", func() bool { _, ok := pl.value(7); return ok })
+
+	token := decodeAs[struct{ Token string }](t, mustCall(t, h, c, "POST", "/api/tokens", `{"name":"Script"}`, 201)).Token
+	th := decodeAs[store.Thing](t, mustCall(t, h, c, "GET", fmt.Sprintf("/api/things/%d", tv.ID), "", 200))
+	pl.mu.Lock()
+	pl.tokens = nil
+	pl.mu.Unlock()
+	req := httptest.NewRequest("DELETE", fmt.Sprintf("http://wherehouse.test/api/attachments/%d", th.Attachments[0].ID), nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != 204 {
+		t.Fatalf("delete with token: %d %s", rec.Code, rec.Body)
+	}
+	time.Sleep(300 * time.Millisecond)
+	if pl.used("Token server-token") {
+		t.Error("the server's token was used for a change made with an API token")
+	}
 }
