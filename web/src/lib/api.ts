@@ -568,6 +568,8 @@ export const api = {
       `/api/connect/households?app=${encodeURIComponent(app)}&redirect_uri=${encodeURIComponent(redirectUri)}`,
     ),
   documentThings: (doc: number) => request<Thing[]>("GET", `/api/paperless/documents/${doc}/things`),
+  /** The person's other households with things a Paperless document is on. */
+  documentHouseholds: (doc: number) => request<Household[]>("GET", `/api/paperless/documents/${doc}/households`),
 
   importHomebox: (url: string, token: string) => request<ImportProgress>("POST", "/api/import/homebox", { url, token }),
   importStatus: () => request<ImportProgress | null>("GET", "/api/import/homebox"),

@@ -21,6 +21,7 @@ import (
 // fakePaperless keeps documents' custom field values, with field 3 being
 // the Wherehouse URL field and field 4 another one.
 // Token "nope" reaches no document and token "ro" may only read them.
+// Document 99 doesn't exist.
 type fakePaperless struct {
 	mu     sync.Mutex
 	fields map[int64][]paperless.CustomField
@@ -53,7 +54,7 @@ func (f *fakePaperless) server(t *testing.T) *httptest.Server {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.tokens = append(f.tokens, r.Header.Get("Authorization"))
-		if doc != 0 && r.Header.Get("Authorization") == "Token nope" {
+		if doc == 99 || doc != 0 && r.Header.Get("Authorization") == "Token nope" {
 			http.Error(w, `{"detail":"Not found."}`, http.StatusNotFound)
 			return
 		}
@@ -303,5 +304,88 @@ func TestBacklinkNeverServerTokenForAPIToken(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 	if pl.used("Token server-token") {
 		t.Error("the server's token was used for a change made with an API token")
+	}
+}
+
+// A link written before who wrote it was recorded: when its document goes
+// from its last thing, the one who linked it there still corrects it.
+func TestBacklinkRemovedLinkerCorrects(t *testing.T) {
+	for _, how := range []string{"attachment", "thing"} {
+		t.Run(how, func(t *testing.T) {
+			pl := &fakePaperless{fields: map[int64][]paperless.CustomField{}}
+			srv := pl.server(t)
+			e := newTestEnv(t, func(c *config.Config) {
+				c.Paperless = config.Paperless{URL: srv.URL, Field: "Wherehouse"}
+			})
+			alice, bob := e.signIn(t, "alice"), e.signIn(t, "bob")
+			h := e.h
+			mustCall(t, h, alice, "PUT", "/api/settings", `{"theme":"system","notifyDays":"7","paperlessToken":"tok","paperlessBacklinks":true}`, 200)
+			mustCall(t, h, bob, "PUT", "/api/settings", `{"theme":"system","notifyDays":"7","paperlessToken":"nope","paperlessBacklinks":true}`, 200)
+			invite := decodeAs[map[string]string](t, mustCall(t, h, alice, "POST", "/api/household/invites", "", 201))
+			mustCall(t, h, bob, "POST", "/api/invites/"+invite["url"][strings.LastIndex(invite["url"], "/")+1:]+"/accept", "", 204)
+
+			tv := add(t, h, alice, `{"name":"TV"}`)
+			mustCall(t, h, alice, "POST", fmt.Sprintf("/api/things/%d/attachments/paperless", tv.ID), `{"documentIds":[7],"kind":"receipt"}`, 201)
+			eventually(t, "link written", func() bool { _, ok := pl.value(7); return ok })
+			// As if written by the previous version.
+			time.Sleep(50 * time.Millisecond)
+			if err := e.st.SetBacklinkWriter(context.Background(), 7, 0); err != nil {
+				t.Fatal(err)
+			}
+			if how == "thing" {
+				mustCall(t, h, bob, "DELETE", fmt.Sprintf("/api/things/%d", tv.ID), "", 204)
+			} else {
+				th := decodeAs[store.Thing](t, mustCall(t, h, bob, "GET", fmt.Sprintf("/api/things/%d", tv.ID), "", 200))
+				mustCall(t, h, bob, "DELETE", fmt.Sprintf("/api/attachments/%d", th.Attachments[0].ID), "", 204)
+			}
+			eventually(t, "link removed", func() bool { _, ok := pl.value(7); return !ok })
+		})
+	}
+}
+
+// Linking several documents where a later one fails still links back
+// those linked before it.
+func TestBacklinkPartlyLinked(t *testing.T) {
+	pl := &fakePaperless{fields: map[int64][]paperless.CustomField{}}
+	srv := pl.server(t)
+	e := newTestEnv(t, func(c *config.Config) {
+		c.Paperless = config.Paperless{URL: srv.URL, Field: "Wherehouse"}
+	})
+	c := e.signIn(t, "a")
+	h := e.h
+	mustCall(t, h, c, "PUT", "/api/settings", `{"theme":"system","notifyDays":"7","paperlessToken":"tok","paperlessBacklinks":true}`, 200)
+	tv, radio := add(t, h, c, `{"name":"TV"}`), add(t, h, c, `{"name":"Radio"}`)
+	mustCall(t, h, c, "POST", fmt.Sprintf("/api/things/%d/attachments/paperless", tv.ID), `{"documentIds":[7],"kind":"receipt"}`, 201)
+	eventually(t, "link to the TV", func() bool { v, _ := pl.value(7); return v == fmt.Sprintf("http://wherehouse.test/i/%d", tv.ID) })
+	mustCall(t, h, c, "POST", fmt.Sprintf("/api/things/%d/attachments/paperless", radio.ID), `{"documentIds":[7,99],"kind":"receipt"}`, 502)
+	eventually(t, "link to the list", func() bool { v, _ := pl.value(7); return v == "http://wherehouse.test/d/7" })
+}
+
+// A document's page names the person's other households it is in.
+func TestDocumentInOtherHouseholds(t *testing.T) {
+	pl := &fakePaperless{fields: map[int64][]paperless.CustomField{}}
+	srv := pl.server(t)
+	e := newTestEnv(t, func(c *config.Config) {
+		c.Paperless = config.Paperless{URL: srv.URL, Field: "Wherehouse"}
+	})
+	c, other := e.signIn(t, "a"), e.signIn(t, "b")
+	h := e.h
+	mustCall(t, h, c, "PUT", "/api/settings", `{"theme":"system","notifyDays":"7","paperlessToken":"tok"}`, 200)
+	mustCall(t, h, other, "PUT", "/api/settings", `{"theme":"system","notifyDays":"7","paperlessToken":"tok"}`, 200)
+	home := households(t, h, c).Current
+	tv := add(t, h, c, `{"name":"TV"}`)
+	mustCall(t, h, c, "POST", fmt.Sprintf("/api/things/%d/attachments/paperless", tv.ID), `{"documentIds":[7],"kind":"receipt"}`, 201)
+	// Someone else's household with it isn't named.
+	lamp := add(t, h, other, `{"name":"Lamp"}`)
+	mustCall(t, h, other, "POST", fmt.Sprintf("/api/things/%d/attachments/paperless", lamp.ID), `{"documentIds":[7],"kind":"receipt"}`, 201)
+	cottage := decodeAs[struct{ ID int64 }](t, mustCall(t, h, c, "POST", "/api/households", `{"name":"Cottage","currency":"EUR"}`, 201))
+	mustCall(t, h, c, "POST", fmt.Sprintf("/api/households/%d/switch", cottage.ID), "", 204)
+
+	got := decodeAs[[]store.Household](t, mustCall(t, h, c, "GET", "/api/paperless/documents/7/households", "", 200))
+	if len(got) != 1 || got[0].ID != home {
+		t.Errorf("households = %+v, want only %d", got, home)
+	}
+	if things := decodeAs[[]store.Thing](t, mustCall(t, h, c, "GET", "/api/paperless/documents/7/things", "", 200)); len(things) != 0 {
+		t.Errorf("things here = %+v", things)
 	}
 }

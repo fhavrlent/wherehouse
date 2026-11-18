@@ -32,7 +32,7 @@ On a thing, **Documents → From Paperless** searches your Paperless and links t
 
 ### Links back from Paperless
 
-With **Link documents back to Wherehouse** on, under **Settings → Paperless-ngx**, documents linked to things get a link in a URL custom field in Paperless, so a receipt in Paperless leads to the thing it belongs to. The link opens the thing, or a list of the things when the document is on several, and opening a thing of another of your households offers to switch to it. Turning the setting on also fills in the link on the documents you linked before, and says how many it updated.
+With **Link documents back to Wherehouse** on, under **Settings → Paperless-ngx**, documents linked to things get a link in a URL custom field in Paperless, so a receipt in Paperless leads to the thing it belongs to. The link opens the thing, or a list of the things when the document is on several, and when they are in another of your households, the page offers to switch to it. Turning the setting on also fills in the link on the documents you linked before, and says how many it updated.
 
 The link follows the document: it changes when the document is linked to another thing or taken off one, and goes when the document is on no thing any more. A value you typed into the field yourself is left alone.
 

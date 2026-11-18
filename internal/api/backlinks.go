@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/fhavrlent/wherehouse/internal/i18n"
 	"github.com/fhavrlent/wherehouse/internal/paperless"
+	"github.com/fhavrlent/wherehouse/internal/store"
 )
 
 // Links back from Paperless: people who turn them on get a URL custom field
@@ -25,13 +27,15 @@ import (
 //
 // The field is written with the Paperless connection of someone who turned
 // links on: by, who changed something, and when borrow is set and
-// Paperless refuses them, whoever linked the document, then whoever wrote
-// its link, so a link to a thing that is gone still gets corrected. Only
-// those have shown they may reach the document; nobody else's connection
-// is ever used for it. Restoring a backup doesn't borrow, as its document
+// Paperless refuses them, whoever linked the document, including those
+// whose links were just removed (ref.Linkers), then whoever wrote its
+// link, so a link to a thing that is gone still gets corrected. Only those
+// have shown they may reach the document; nobody else's connection is ever
+// used for it. Restoring a backup doesn't borrow, as its document
 // IDs come from a file. A change made with an API token never uses the
 // server's own token, as with userPaperless.
-func (s *Server) syncBacklink(ctx context.Context, by actor, doc int64, borrow bool) error {
+func (s *Server) syncBacklink(ctx context.Context, by actor, ref store.DocumentRef, borrow bool) error {
+	doc := ref.Doc
 	// One update per document at a time, reading the latest state once it's
 	// its turn, so an older update can't finish last and win.
 	lock, _ := s.docLocks.LoadOrStore(doc, new(sync.Mutex))
@@ -48,7 +52,7 @@ func (s *Server) syncBacklink(ctx context.Context, by actor, doc int64, borrow b
 		if err != nil {
 			return err
 		}
-		candidates = append(append(candidates, linkers...), writer...)
+		candidates = slices.Concat(candidates, ref.Linkers, linkers, writer)
 	}
 	var refused error
 	tried := map[int64]bool{}
@@ -175,7 +179,7 @@ func setLinkField(fields []paperless.CustomField, id int64, want string, ours ..
 // syncBacklinksLater updates documents' link fields in the background, so a
 // slow or refusing Paperless doesn't hold up the request that changed them.
 // borrow is as for syncBacklink.
-func (s *Server) syncBacklinksLater(by actor, borrow bool, docs ...int64) {
+func (s *Server) syncBacklinksLater(by actor, borrow bool, docs ...store.DocumentRef) {
 	if len(docs) == 0 || s.cfg.Paperless.URL == "" {
 		return
 	}
@@ -186,10 +190,23 @@ func (s *Server) syncBacklinksLater(by actor, borrow bool, docs ...int64) {
 		defer cancel()
 		for _, d := range docs {
 			if err := s.syncBacklink(ctx, by, d, borrow); err != nil {
-				slog.Warn("update link in paperless", "doc", d, "err", err)
+				slog.Warn("update link in paperless", "doc", d.Doc, "err", err)
 			}
 		}
 	}()
+}
+
+// Wait waits for links being written in the background, or until ctx ends.
+func (s *Server) Wait(ctx context.Context) {
+	done := make(chan struct{})
+	go func() {
+		s.backlinks.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-ctx.Done():
+	}
 }
 
 // syncAllBacklinks updates every document the person linked, e.g. right
@@ -209,7 +226,7 @@ func (s *Server) syncAllBacklinks(w http.ResponseWriter, r *http.Request) {
 		Error     *apiError `json:"error,omitempty"`
 	}{Documents: len(docs)}
 	for _, d := range docs {
-		if err := s.syncBacklink(ctx, actorOf(r), d, false); err != nil {
+		if err := s.syncBacklink(ctx, actorOf(r), store.DocumentRef{Doc: d}, false); err != nil {
 			slog.Warn("update link in paperless", "doc", d, "err", err)
 			out.Failed++
 			if out.Error == nil {
@@ -233,4 +250,13 @@ func backlinkError(err error) *apiError {
 		return &apiError{Error: i18n.T(i18n.Fallback, "server.paperlessCantEdit", nil), Code: "server.paperlessCantEdit"}
 	}
 	return &apiError{Error: err.Error()}
+}
+
+// docRefs are documents with nobody's link to them just removed.
+func docRefs(ids ...int64) []store.DocumentRef {
+	out := make([]store.DocumentRef, len(ids))
+	for i, id := range ids {
+		out[i] = store.DocumentRef{Doc: id}
+	}
+	return out
 }

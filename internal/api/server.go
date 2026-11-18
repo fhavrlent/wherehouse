@@ -137,6 +137,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /api/paperless/search", s.searchPaperless)
 	api.HandleFunc("POST /api/paperless/links", sessionOnly(s.syncAllBacklinks))
 	api.HandleFunc("GET /api/paperless/documents/{doc}/things", s.documentThings)
+	api.HandleFunc("GET /api/paperless/documents/{doc}/households", sessionOnly(s.documentHouseholds))
 
 	api.HandleFunc("GET /api/maintenance/due", s.dueMaintenance)
 	api.HandleFunc("PUT /api/maintenance/{id}", s.updateMaintenance)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"slices"
 )
 
 // Where an attachment is kept.
@@ -180,17 +181,47 @@ func (s *Store) LinkedDocuments(ctx context.Context, uid int64) ([]int64, error)
 	return s.ids(ctx, `SELECT DISTINCT paperless_doc_id FROM attachments WHERE added_by = ? AND paperless_doc_id IS NOT NULL ORDER BY paperless_doc_id`, uid)
 }
 
+// DocumentRef is a Paperless document linked to things, with who linked
+// it there.
+type DocumentRef struct {
+	Doc     int64
+	Linkers []int64
+}
+
 // ThingDocuments lists the Paperless documents linked to a thing.
-func (s *Store) ThingDocuments(ctx context.Context, hh, thing int64) ([]int64, error) {
-	return s.ids(ctx, `SELECT DISTINCT a.paperless_doc_id FROM attachments a JOIN things t ON t.id = a.thing_id
-		WHERE t.household_id = ? AND a.thing_id = ? AND a.paperless_doc_id IS NOT NULL`, hh, thing)
+func (s *Store) ThingDocuments(ctx context.Context, hh, thing int64) ([]DocumentRef, error) {
+	return s.documentRefs(ctx, `SELECT a.paperless_doc_id, a.added_by FROM attachments a JOIN things t ON t.id = a.thing_id
+		WHERE t.household_id = ? AND a.thing_id = ? AND a.paperless_doc_id IS NOT NULL ORDER BY a.paperless_doc_id`, hh, thing)
 }
 
 // HouseholdDocuments lists the Paperless documents linked to a household's
 // things.
-func (s *Store) HouseholdDocuments(ctx context.Context, hh int64) ([]int64, error) {
-	return s.ids(ctx, `SELECT DISTINCT a.paperless_doc_id FROM attachments a JOIN things t ON t.id = a.thing_id
-		WHERE t.household_id = ? AND a.paperless_doc_id IS NOT NULL`, hh)
+func (s *Store) HouseholdDocuments(ctx context.Context, hh int64) ([]DocumentRef, error) {
+	return s.documentRefs(ctx, `SELECT a.paperless_doc_id, a.added_by FROM attachments a JOIN things t ON t.id = a.thing_id
+		WHERE t.household_id = ? AND a.paperless_doc_id IS NOT NULL ORDER BY a.paperless_doc_id`, hh)
+}
+
+func (s *Store) documentRefs(ctx context.Context, query string, args ...any) ([]DocumentRef, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []DocumentRef
+	for rows.Next() {
+		var doc int64
+		var by sql.NullInt64
+		if err := rows.Scan(&doc, &by); err != nil {
+			return nil, err
+		}
+		if len(out) == 0 || out[len(out)-1].Doc != doc {
+			out = append(out, DocumentRef{Doc: doc})
+		}
+		if last := &out[len(out)-1]; by.Valid && !slices.Contains(last.Linkers, by.Int64) {
+			last.Linkers = append(last.Linkers, by.Int64)
+		}
+	}
+	return out, rows.Err()
 }
 
 // BacklinkWriter is who wrote the link back in a Paperless document, if
@@ -209,6 +240,26 @@ func (s *Store) SetBacklinkWriter(ctx context.Context, doc, uid int64) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO paperless_backlinks (doc_id, user_id) VALUES (?, ?)
 		ON CONFLICT (doc_id) DO UPDATE SET user_id = excluded.user_id`, doc, uid)
 	return err
+}
+
+// DocumentHouseholds lists the person's households other than hh with
+// things a Paperless document is linked to.
+func (s *Store) DocumentHouseholds(ctx context.Context, uid, hh, doc int64) ([]Household, error) {
+	ids, err := s.ids(ctx, `SELECT DISTINCT t.household_id FROM attachments a JOIN things t ON t.id = a.thing_id
+		JOIN household_members m ON m.household_id = t.household_id AND m.user_id = ?
+		WHERE a.paperless_doc_id = ? AND t.household_id <> ? ORDER BY t.household_id`, uid, doc, hh)
+	if err != nil {
+		return nil, err
+	}
+	out := []Household{}
+	for _, id := range ids {
+		h, err := s.GetHousehold(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *h)
+	}
+	return out, nil
 }
 
 // ThingHousehold is the household a thing is in.

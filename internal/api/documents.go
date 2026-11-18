@@ -137,6 +137,10 @@ func (s *Server) linkPaperless(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := []*store.Attachment{}
+	// The documents linked so far get their link back even when a later one
+	// fails.
+	var linked []int64
+	defer func() { s.syncBacklinksLater(actorOf(r), true, docRefs(linked...)...) }()
 	for _, docID := range in.DocumentIDs {
 		doc, err := pc.Document(r.Context(), docID)
 		if err != nil {
@@ -154,8 +158,8 @@ func (s *Server) linkPaperless(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		out = append(out, a)
+		linked = append(linked, doc.ID)
 	}
-	s.syncBacklinksLater(actorOf(r), true, in.DocumentIDs...)
 	writeJSON(w, http.StatusCreated, out)
 }
 
@@ -172,6 +176,21 @@ func (s *Server) documentThings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, things)
+}
+
+// documentHouseholds lists the person's other households with things a
+// Paperless document is on, so its link back can offer to switch there.
+func (s *Server) documentHouseholds(w http.ResponseWriter, r *http.Request) {
+	doc, ok := pathID(w, r, "doc")
+	if !ok {
+		return
+	}
+	hhs, err := s.store.DocumentHouseholds(r.Context(), userID(r), household(r), doc)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, 200, hhs)
 }
 
 func (s *Server) searchPaperless(w http.ResponseWriter, r *http.Request) {
@@ -312,7 +331,11 @@ func (s *Server) deleteAttachment(w http.ResponseWriter, r *http.Request) {
 		s.files.Remove(a.File)
 	}
 	if a.PaperlessDocID != nil {
-		s.syncBacklinksLater(actorOf(r), true, *a.PaperlessDocID)
+		ref := store.DocumentRef{Doc: *a.PaperlessDocID}
+		if a.AddedBy != nil {
+			ref.Linkers = []int64{*a.AddedBy}
+		}
+		s.syncBacklinksLater(actorOf(r), true, ref)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

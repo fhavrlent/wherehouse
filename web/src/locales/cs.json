@@ -681,6 +681,8 @@
   },
   "document": {
     "title": "Dokument {{id}} v Paperless",
-    "none": "Tenhle dokument tu není u ničeho."
+    "none": "Tenhle dokument tu není u ničeho.",
+    "otherHousehold": "Je i u věcí v „{{name}}“, jiné vaší domácnosti.",
+    "elsewhere": "Je u věcí v „{{name}}“, jiné vaší domácnosti."
   }
 }

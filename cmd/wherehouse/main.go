@@ -118,7 +118,10 @@ func run() error {
 		slog.Info("shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		return httpSrv.Shutdown(shutdownCtx)
+		err := httpSrv.Shutdown(shutdownCtx)
+		// Links being written in Paperless finish before the database closes.
+		srv.Wait(shutdownCtx)
+		return err
 	}
 	return nil
 }

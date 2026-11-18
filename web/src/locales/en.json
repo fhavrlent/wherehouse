@@ -633,6 +633,8 @@
   },
   "document": {
     "title": "Paperless document {{id}}",
-    "none": "This document isn’t on anything here."
+    "none": "This document isn’t on anything here.",
+    "otherHousehold": "It’s also on things in “{{name}}”, another of your households.",
+    "elsewhere": "It’s on things in “{{name}}”, another of your households."
   }
 }
