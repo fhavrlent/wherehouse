@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"sync"
@@ -104,7 +105,7 @@ func (s *Server) writeBacklink(ctx context.Context, pc *paperless.Client, uid, d
 	if err != nil {
 		return err
 	}
-	fields, changed := setLinkField(current, field, want, app+"/i/", app+"/d/")
+	fields, changed := setLinkField(current, field, want, ourLink(app, doc, things))
 	if !changed {
 		// Nothing written, so nothing shows this connection may write: who
 		// wrote the link stays as it was.
@@ -144,20 +145,41 @@ type actor struct {
 
 func actorOf(r *http.Request) actor { return actor{uid: userID(r), token: isToken(r)} }
 
+// ourLink tells a link Wherehouse wrote in a document's field from one
+// someone typed in. Links written while Wherehouse had another address
+// count too: the document's own /d/ link, the only one earlier versions
+// wrote, and a link to a thing the document is on.
+func ourLink(app string, doc int64, things []int64) func(string) bool {
+	return func(v string) bool {
+		if strings.HasPrefix(v, app+"/i/") || strings.HasPrefix(v, app+"/d/") {
+			return true
+		}
+		u, err := url.Parse(v)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.RawQuery != "" || u.Fragment != "" {
+			return false
+		}
+		if u.Path == fmt.Sprintf("/d/%d", doc) {
+			return true
+		}
+		for _, t := range things {
+			if u.Path == fmt.Sprintf("/i/%d", t) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
 // setLinkField sets field id to want, or removes it when want is empty,
-// unless it holds a value that doesn't start with one of ours. It reports
-// whether anything changed.
-func setLinkField(fields []paperless.CustomField, id int64, want string, ours ...string) ([]paperless.CustomField, bool) {
+// unless it holds a value that isn't ours. It reports whether anything
+// changed.
+func setLinkField(fields []paperless.CustomField, id int64, want string, ours func(string) bool) ([]paperless.CustomField, bool) {
 	for i, f := range fields {
 		if f.Field != id {
 			continue
 		}
 		cur, isText := f.Value.(string)
-		mine := cur == ""
-		for _, p := range ours {
-			mine = mine || strings.HasPrefix(cur, p)
-		}
-		if (f.Value != nil && !isText) || !mine {
+		if (f.Value != nil && !isText) || (cur != "" && !ours(cur)) {
 			return fields, false // someone else's value
 		}
 		if want == "" {
