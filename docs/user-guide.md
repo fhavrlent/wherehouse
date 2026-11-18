@@ -79,7 +79,7 @@ A thing linked to a warranty in Warranteed shows its purchase and warranty detai
 ## Photos, documents and links
 
 - **Photos**: add as many as you like. The first one is the cover, shown in lists; any photo's menu can **Make cover**.
-- **Documents**: **Upload** manuals, receipts, warranty cards and other files, or, with Paperless-ngx connected, **From Paperless** to link documents that are already there. A linked document opens for everyone in the household through the connection of whoever linked it. Removing it only unlinks it; the document stays in Paperless.
+- **Documents**: **Upload** manuals, receipts, warranty cards and other files, or, with Paperless-ngx connected, **From Paperless** to link documents that are already there. A linked document's name opens it in Paperless; its download button gets the file for everyone in the household, through the connection of whoever linked it. Removing it only unlinks it; the document stays in Paperless.
 - **Links**: the shop's page, a video, the manual online.
 
 ## Maintenance and reminders

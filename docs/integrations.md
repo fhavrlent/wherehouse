@@ -28,7 +28,7 @@ None of them is needed; Wherehouse works on its own.
 
 `PAPERLESS_TOKEN` is optional and only ever used for admins who haven't saved a token of their own; other people never get it.
 
-On a thing, **Documents → From Paperless** searches your Paperless and links the documents you pick as a manual, receipt, warranty or other document. A linked document opens for everyone in the household through the connection of whoever linked it, so others can open that document but nothing else in your Paperless. Removing it only unlinks it; the document stays in Paperless.
+On a thing, **Documents → From Paperless** searches your Paperless and links the documents you pick as a manual, receipt, warranty or other document. A linked document's name opens it in Paperless. Its download button gets the file for everyone in the household through the connection of whoever linked it, so others can get that document but nothing else in your Paperless. Removing it only unlinks it; the document stays in Paperless.
 
 ### Links back from Paperless
 
