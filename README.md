@@ -89,7 +89,7 @@ Print at 100 % ("actual size"), with no margins. To use a partly used sheet, ski
 
 ## Paperless-ngx
 
-Set `PAPERLESS_URL` to your Paperless instance (and `PAPERLESS_PUBLIC_URL` if that's an internal address). Each person adds their own API token under **Settings → Paperless-ngx**, so Paperless's permissions decide what they can link. A linked document opens for the rest of the household through the connection of whoever linked it. `PAPERLESS_TOKEN` is optional and only ever used for admins. See the [integration guide](docs/integrations.md#paperless-ngx) for links back from Paperless.
+Set `PAPERLESS_URL` to your Paperless instance (and `PAPERLESS_PUBLIC_URL` if that's an internal address). Each person adds their own API token under **Settings → Paperless-ngx**, so Paperless's permissions decide what they can link. A linked document opens in Paperless, and the rest of the household can download it through the connection of whoever linked it. `PAPERLESS_TOKEN` is optional and only ever used for admins. See the [integration guide](docs/integrations.md#paperless-ngx) for links back from Paperless.
 
 ## Reminders
 

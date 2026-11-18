@@ -33,6 +33,12 @@ export const Documents = ({ thingId, documents }: { thingId: number; documents: 
       invalidate();
     }
   };
+  // A document linked from Paperless opens there; the download button
+  // still gives the file.
+  const openUrl = (d: Attachment) =>
+    d.storage === "paperless" && d.paperlessDocId !== null && settings?.paperlessUrl
+      ? `${settings.paperlessUrl}/documents/${d.paperlessDocId}/details`
+      : attachmentUrl(d);
   const run = async (fn: () => Promise<unknown>) => {
     try {
       await fn();
@@ -73,7 +79,7 @@ export const Documents = ({ thingId, documents }: { thingId: number; documents: 
               <FileText className="mt-0.5 size-4 shrink-0 text-fg-subtle" />
               <div className="min-w-0 flex-1">
                 <a
-                  href={attachmentUrl(d)}
+                  href={openUrl(d)}
                   target="_blank"
                   rel="noreferrer"
                   className="line-clamp-2 text-sm break-words hover:text-primary"
