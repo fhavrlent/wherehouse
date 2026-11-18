@@ -82,6 +82,8 @@ func newTestEnv(t *testing.T, configure ...func(*config.Config)) *testEnv {
 		f(cfg)
 	}
 	srv := New(cfg, st, auth.New(cfg, st, key), files, assets, "test")
+	// Background work ends before the database closes.
+	t.Cleanup(func() { srv.Wait(context.Background()) })
 	return &testEnv{h: srv.Handler(), st: st}
 }
 

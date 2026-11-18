@@ -66,7 +66,7 @@ func TestPaperlessLinkBack(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if len(patched) != 1 || !strings.Contains(patched[0], `http://wherehouse.test/d/7`) || !strings.Contains(patched[0], `"field":3`) {
+	if len(patched) != 1 || !strings.Contains(patched[0], fmt.Sprintf(`http://wherehouse.test/i/%d`, tv.ID)) || !strings.Contains(patched[0], `"field":3`) {
 		t.Fatalf("patched = %q", patched)
 	}
 

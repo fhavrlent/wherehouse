@@ -12,6 +12,7 @@ import {
   QrCode,
   Trash2,
 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, useNavigate, useParams } from "react-router";
@@ -30,7 +31,16 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { Card, CardHeader } from "@/components/ui/misc";
-import { api, errorMessage, isPlace, pathText, type FieldType, type ThingDetail } from "@/lib/api";
+import {
+  api,
+  ApiError,
+  errorMessage,
+  isPlace,
+  pathText,
+  type FieldType,
+  type Household,
+  type ThingDetail,
+} from "@/lib/api";
 import { appName } from "@/lib/apps";
 import { kindName } from "@/lib/kinds";
 import { printList } from "@/lib/labels";
@@ -41,9 +51,41 @@ import { formatMoney } from "@/lib/utils";
 export const ThingPage = () => {
   const id = Number(useParams().id);
   const { data: thing, isLoading, error } = useThing(id);
+  const missing = error instanceof ApiError && error.status === 404;
+  // A thing of another of the person's households, e.g. opened from Paperless.
+  const other = useQuery({
+    queryKey: ["thingHousehold", id],
+    queryFn: () => api.thingHousehold(id),
+    enabled: missing,
+    retry: false,
+  });
+  if (missing && other.isLoading) return <div className="h-96 animate-pulse rounded-2xl bg-surface-3/60" />;
+  if (missing && other.data) return <OtherHousehold household={other.data} />;
   if (error) return <p className="text-sm text-fg-muted">{errorMessage(error)}</p>;
   if (isLoading || !thing) return <div className="h-96 animate-pulse rounded-2xl bg-surface-3/60" />;
   return <ThingView key={thing.id} thing={thing} />;
+};
+
+const OtherHousehold = ({ household }: { household: Household }) => {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  return (
+    <Card className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-10 text-center">
+      <p className="text-sm text-fg-muted">{t("thing.otherHousehold", { name: household.name })}</p>
+      <Button
+        onClick={async () => {
+          try {
+            await api.switchHousehold(household.id);
+            await qc.invalidateQueries();
+          } catch (e) {
+            toast.error(errorMessage(e));
+          }
+        }}
+      >
+        {t("labelPage.switch", { name: household.name })}
+      </Button>
+    </Card>
+  );
 };
 
 const ThingView = ({ thing }: { thing: ThingDetail }) => {

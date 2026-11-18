@@ -83,7 +83,15 @@
       "ok": "Připojeno: {{documents}} dokumentů",
       "forget": "Zapomenout můj token",
       "backlinks": "Odkazovat z dokumentů zpět do Wherehouse",
-      "backlinksHint": "Dokumenty, které připojíte, dostanou v poli „{{field}}“ odkaz na své věci. Token musí smět měnit dokumenty."
+      "backlinksHint": "Dokumenty připojené k věcem dostanou v poli „{{field}}“ odkaz na svou věc; zapnutím se doplní i k těm, které jste připojili dřív. Token musí smět měnit dokumenty.",
+      "backlinksDone_one": "Odkazy aktualizovány u {{count}} dokumentu",
+      "backlinksDone_few": "Odkazy aktualizovány u {{count}} dokumentů",
+      "backlinksDone_many": "Odkazy aktualizovány u {{count}} dokumentu",
+      "backlinksDone_other": "Odkazy aktualizovány u {{count}} dokumentů",
+      "backlinksFailed_one": "U {{failed}} z {{count}} dokumentu se to nepovedlo",
+      "backlinksFailed_few": "U {{failed}} z {{count}} dokumentů se to nepovedlo",
+      "backlinksFailed_many": "U {{failed}} z {{count}} dokumentu se to nepovedlo",
+      "backlinksFailed_other": "U {{failed}} z {{count}} dokumentů se to nepovedlo"
     },
     "fields": {
       "title": "Vlastní pole",
@@ -280,7 +288,9 @@
     "backupTooLarge": "Záloha je příliš velká",
     "backupInvalid": "Tohle není záloha z Wherehouse (export.zip)",
     "backupFileTooLarge": "Soubor v záloze je větší než {{mb}} MB",
-    "connectedAppOnly": "Tohle může jen token připojené aplikace"
+    "connectedAppOnly": "Tohle může jen token připojené aplikace",
+    "paperlessCantEdit": "Paperless nedovolí vašemu tokenu měnit dokumenty",
+    "paperlessFieldType": "Vlastní pole „{{name}}“ v Paperless existuje, ale není typu URL"
   },
   "signIn": {
     "unreachable": "Poskytovatel identity není dostupný. Zkuste to za chvíli znovu.",
@@ -559,7 +569,8 @@
     "templateSaved": "Uloženo jako šablona. Vyberete ji při přidávání věci.",
     "template": "Šablona",
     "fromApp": "Z {{app}}",
-    "details": "Podrobnosti"
+    "details": "Podrobnosti",
+    "otherHousehold": "Tahle věc je v „{{name}}“, jiné vaší domácnosti."
   },
   "thingForm": {
     "editTitle": "Upravit",
@@ -670,6 +681,8 @@
   },
   "document": {
     "title": "Dokument {{id}} v Paperless",
-    "none": "Tenhle dokument tu není u ničeho."
+    "none": "Tenhle dokument tu není u ničeho.",
+    "otherHousehold": "Je i u věcí v „{{name}}“, jiné vaší domácnosti.",
+    "elsewhere": "Je u věcí v „{{name}}“, jiné vaší domácnosti."
   }
 }

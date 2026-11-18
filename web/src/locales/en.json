@@ -81,7 +81,11 @@
       "ok": "Connected: {{documents}} documents",
       "forget": "Forget my token",
       "backlinks": "Link documents back to Wherehouse",
-      "backlinksHint": "Documents you link get a link to their things in the “{{field}}” custom field. Your token must be allowed to change documents."
+      "backlinksHint": "Documents linked to things get a link to their thing in the “{{field}}” custom field, and turning this on fills it in on those you linked before. Your token must be allowed to change documents.",
+      "backlinksDone_one": "Links updated on {{count}} document",
+      "backlinksDone_other": "Links updated on {{count}} documents",
+      "backlinksFailed_one": "{{failed}} of {{count}} document couldn’t be updated",
+      "backlinksFailed_other": "{{failed}} of {{count}} documents couldn’t be updated"
     },
     "fields": {
       "title": "Custom fields",
@@ -270,7 +274,9 @@
     "backupTooLarge": "The backup is too large",
     "backupInvalid": "That isn't a Wherehouse backup (export.zip)",
     "backupFileTooLarge": "A file in the backup is larger than {{mb}} MB",
-    "connectedAppOnly": "Only the token of a connected app can do this"
+    "connectedAppOnly": "Only the token of a connected app can do this",
+    "paperlessCantEdit": "Paperless doesn’t let your token change documents",
+    "paperlessFieldType": "The Paperless custom field “{{name}}” exists but isn’t a URL field"
   },
   "signIn": {
     "unreachable": "Could not reach the identity provider. Try again in a moment.",
@@ -523,7 +529,8 @@
     "templateSaved": "Saved as a template. Pick it when adding a thing.",
     "template": "Template",
     "fromApp": "From {{app}}",
-    "details": "Details"
+    "details": "Details",
+    "otherHousehold": "This thing is in “{{name}}”, another of your households."
   },
   "thingForm": {
     "editTitle": "Edit",
@@ -626,6 +633,8 @@
   },
   "document": {
     "title": "Paperless document {{id}}",
-    "none": "This document isn’t on anything here."
+    "none": "This document isn’t on anything here.",
+    "otherHousehold": "It’s also on things in “{{name}}”, another of your households.",
+    "elsewhere": "It’s on things in “{{name}}”, another of your households."
   }
 }

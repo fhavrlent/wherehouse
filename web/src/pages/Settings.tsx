@@ -21,7 +21,15 @@ import { ConfirmDialog } from "@/components/ui/dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { Card, Segmented } from "@/components/ui/misc";
 import { browserLanguage, LANGUAGES } from "@/i18n";
-import { api, errorMessage, FIELD_TYPES, type FieldType, type Kind, type Settings as SettingsT } from "@/lib/api";
+import {
+  api,
+  errorMessage,
+  FIELD_TYPES,
+  translateServer,
+  type FieldType,
+  type Kind,
+  type Settings as SettingsT,
+} from "@/lib/api";
 import { kindName } from "@/lib/kinds";
 import { IconPicker } from "@/components/IconPicker";
 import { KindIcon } from "@/components/KindIcon";
@@ -212,6 +220,26 @@ const Paperless = ({ s }: { s: SettingsT }) => {
   const update = useAutoSave(s);
   const [token, setToken] = useState("");
   const [testing, setTesting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  // Turning links on also fills them in on documents linked before.
+  const setBacklinks = async (on: boolean) => {
+    if (!(await update({ paperlessBacklinks: on })) || !on) return;
+    setSyncing(true);
+    try {
+      const res = await api.syncPaperlessLinks();
+      if (res.failed > 0) {
+        toast.error(t("settings.paperless.backlinksFailed", { count: res.documents, failed: res.failed }), {
+          description: res.error ? translateServer(res.error.error, res.error.code, res.error.params) : undefined,
+        });
+      } else {
+        toast.success(t("settings.paperless.backlinksDone", { count: res.documents }));
+      }
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setSyncing(false);
+    }
+  };
   const test = async () => {
     setTesting(true);
     try {
@@ -263,10 +291,7 @@ const Paperless = ({ s }: { s: SettingsT }) => {
         </div>
       </Field>
       <label className="flex items-start gap-3 text-sm">
-        <Switch
-          checked={s.paperlessBacklinks}
-          onCheckedChange={(paperlessBacklinks) => update({ paperlessBacklinks })}
-        />
+        <Switch checked={s.paperlessBacklinks} disabled={syncing} onCheckedChange={(on) => void setBacklinks(on)} />
         <span>
           {t("settings.paperless.backlinks")}
           <span className="block text-xs text-fg-subtle">

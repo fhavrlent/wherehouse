@@ -137,6 +137,10 @@ func (s *Server) linkPaperless(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := []*store.Attachment{}
+	// The documents linked so far get their link back even when a later one
+	// fails.
+	var linked []int64
+	defer func() { s.syncBacklinksLater(actorOf(r), true, docRefs(linked...)...) }()
 	for _, docID := range in.DocumentIDs {
 		doc, err := pc.Document(r.Context(), docID)
 		if err != nil {
@@ -154,44 +158,9 @@ func (s *Server) linkPaperless(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		out = append(out, a)
-	}
-	if st, err := s.store.Settings(r.Context(), uid); err == nil && st.PaperlessBacklinks {
-		for _, id := range in.DocumentIDs {
-			go s.linkBack(pc, id)
-		}
+		linked = append(linked, doc.ID)
 	}
 	writeJSON(w, http.StatusCreated, out)
-}
-
-// linkBack fills the document's Wherehouse URL field with the page of the
-// things it is on, unless someone put something else there. The page lists
-// whatever the document is on at the time, so the link never needs
-// changing.
-func (s *Server) linkBack(pc *paperless.Client, doc int64) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	want := fmt.Sprintf("%s/d/%d", strings.TrimSuffix(s.cfg.AppURL.String(), "/"), doc)
-	field, err := pc.CustomFieldID(ctx, s.cfg.Paperless.Field, "url", true)
-	if err != nil {
-		slog.Warn("paperless link back: field", "doc", doc, "err", err)
-		return
-	}
-	fields, err := pc.DocumentCustomFields(ctx, doc)
-	if err != nil {
-		slog.Warn("paperless link back: read", "doc", doc, "err", err)
-		return
-	}
-	for _, f := range fields {
-		if f.Field == field {
-			if v, _ := f.Value.(string); v != "" {
-				return
-			}
-		}
-	}
-	fields = append(fields, paperless.CustomField{Field: field, Value: want})
-	if err := pc.SetDocumentCustomFields(ctx, doc, fields); err != nil {
-		slog.Warn("paperless link back: write", "doc", doc, "err", err)
-	}
 }
 
 // documentThings lists the things a Paperless document is on, for the
@@ -207,6 +176,21 @@ func (s *Server) documentThings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, things)
+}
+
+// documentHouseholds lists the person's other households with things a
+// Paperless document is on, so its link back can offer to switch there.
+func (s *Server) documentHouseholds(w http.ResponseWriter, r *http.Request) {
+	doc, ok := pathID(w, r, "doc")
+	if !ok {
+		return
+	}
+	hhs, err := s.store.DocumentHouseholds(r.Context(), userID(r), household(r), doc)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, 200, hhs)
 }
 
 func (s *Server) searchPaperless(w http.ResponseWriter, r *http.Request) {
@@ -345,6 +329,13 @@ func (s *Server) deleteAttachment(w http.ResponseWriter, r *http.Request) {
 	}
 	if a.File != "" {
 		s.files.Remove(a.File)
+	}
+	if a.PaperlessDocID != nil {
+		ref := store.DocumentRef{Doc: *a.PaperlessDocID}
+		if a.AddedBy != nil {
+			ref.Linkers = []int64{*a.AddedBy}
+		}
+		s.syncBacklinksLater(actorOf(r), true, ref)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
