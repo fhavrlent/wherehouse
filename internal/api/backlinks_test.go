@@ -134,8 +134,12 @@ func TestBacklinksFilledInLater(t *testing.T) {
 	pl := &fakePaperless{fields: map[int64][]paperless.CustomField{
 		// Someone typed their own link into document 9.
 		9: {{Field: 3, Value: "https://example.com/mine"}, {Field: 4, Value: "kept"}},
-		// Document 8 has the link of the previous version.
-		8: {{Field: 3, Value: "http://wherehouse.test/d/8"}},
+		// Document 8 has the link of the previous version, 10 that link from
+		// when Wherehouse had another address, and 11 someone's link that
+		// only looks like one.
+		8:  {{Field: 3, Value: "http://wherehouse.test/d/8"}},
+		10: {{Field: 3, Value: "https://old.example/d/10"}},
+		11: {{Field: 3, Value: "https://other.example/d/12"}},
 	}}
 	srv := pl.server(t)
 	e := newTestEnv(t, func(c *config.Config) {
@@ -145,7 +149,7 @@ func TestBacklinksFilledInLater(t *testing.T) {
 	h := e.h
 	mustCall(t, h, c, "PUT", "/api/settings", `{"theme":"system","notifyDays":"7","paperlessToken":"tok"}`, 200)
 	tv := add(t, h, c, `{"name":"TV"}`)
-	mustCall(t, h, c, "POST", fmt.Sprintf("/api/things/%d/attachments/paperless", tv.ID), `{"documentIds":[7,8,9],"kind":"receipt"}`, 201)
+	mustCall(t, h, c, "POST", fmt.Sprintf("/api/things/%d/attachments/paperless", tv.ID), `{"documentIds":[7,8,9,10,11],"kind":"receipt"}`, 201)
 	time.Sleep(100 * time.Millisecond)
 	if v, ok := pl.value(7); ok {
 		t.Fatalf("link written with links off: %q", v)
@@ -154,17 +158,20 @@ func TestBacklinksFilledInLater(t *testing.T) {
 	mustCall(t, h, c, "PUT", "/api/settings", `{"theme":"system","notifyDays":"7","paperlessBacklinks":true}`, 200)
 	var res struct{ Documents, Failed int }
 	json.Unmarshal(mustCall(t, h, c, "POST", "/api/paperless/links", "", 200).Body.Bytes(), &res)
-	if res.Documents != 3 || res.Failed != 0 {
+	if res.Documents != 5 || res.Failed != 0 {
 		t.Errorf("filled in = %+v", res)
 	}
 	want := fmt.Sprintf("http://wherehouse.test/i/%d", tv.ID)
-	for _, doc := range []int64{7, 8} {
+	for _, doc := range []int64{7, 8, 10} {
 		if v, _ := pl.value(doc); v != want {
 			t.Errorf("document %d links to %q", doc, v)
 		}
 	}
 	if v, _ := pl.value(9); v != "https://example.com/mine" || len(pl.fields[9]) != 2 {
 		t.Errorf("someone's own link changed: %+v", pl.fields[9])
+	}
+	if v, _ := pl.value(11); v != "https://other.example/d/12" {
+		t.Errorf("someone's link that looks like one changed: %q", v)
 	}
 }
 
