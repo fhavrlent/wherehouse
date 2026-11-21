@@ -8,6 +8,7 @@ import { useComposing } from "@/lib/ime";
 import { cn } from "@/lib/utils";
 import { KindIcon } from "./KindIcon";
 import { Dialog } from "./ui/dialog";
+import { useField } from "./ui/field";
 import { Input } from "./ui/input";
 
 /** Picks a place from all of them, by typing part of its name or path. */
@@ -88,6 +89,7 @@ export const PlacePicker = ({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("picker.search")}
+          aria-label={t("picker.search")}
           className="pl-9"
           onCompositionEnd={ime.onCompositionEnd}
           onKeyDown={(e) => {
@@ -181,10 +183,15 @@ export const PlaceField = ({
   const { data: places = [] } = usePlaces();
   const [open, setOpen] = useState(false);
   const place = places.find((p) => p.id === value);
+  const field = useField();
   return (
     <>
       <button
         type="button"
+        id={field?.id}
+        // The field's name, then the place chosen.
+        aria-labelledby={field ? `${field.labelId} ${field.id}` : undefined}
+        aria-describedby={field?.describedBy}
         onClick={() => setOpen(true)}
         className="flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-3 text-left text-sm shadow-card hover:border-border-strong"
       >

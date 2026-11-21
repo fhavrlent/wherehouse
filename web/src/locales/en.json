@@ -5,7 +5,8 @@
     "close": "Close",
     "dialog": "Dialog",
     "optional": "optional",
-    "save": "Save"
+    "save": "Save",
+    "error": "Error"
   },
   "nav": {
     "things": "Things",
@@ -92,7 +93,10 @@
       "description": "Extra details every thing can have, such as price, purchase date or warranty until.",
       "delete": "Delete {{name}}",
       "namePlaceholder": "New field, e.g. Price",
-      "add": "Add field"
+      "add": "Add field",
+      "rename": "Name of the field {{name}}",
+      "newName": "Name of the new field",
+      "type": "Type of the new field"
     },
     "import": {
       "title": "Import from HomeBox",
@@ -117,7 +121,8 @@
       "unused": "Not used yet",
       "delete": "Delete {{name}}",
       "namePlaceholder": "Name, e.g. Warranteed",
-      "create": "Create token"
+      "create": "Create token",
+      "name": "Name of the new token"
     },
     "household": {
       "title": "Household",
@@ -140,7 +145,8 @@
       "delete": "Delete the household",
       "deleteTitle": "Delete “{{name}}”?",
       "deleteBody": "Every place, thing, photo, document and label in it is deleted, and can’t be brought back. Export it first to keep a copy. Documents in Paperless stay there.",
-      "deleteHint": "Only a household with nobody else in it can be deleted."
+      "deleteHint": "Only a household with nobody else in it can be deleted.",
+      "roleOf": "Role of {{name}}"
     },
     "kinds": {
       "title": "Kinds",
@@ -150,7 +156,9 @@
       "placeHint": "Shown as a place",
       "delete": "Delete {{name}}",
       "namePlaceholder": "New kind, e.g. Power tool",
-      "add": "Add kind"
+      "add": "Add kind",
+      "rename": "Name of the kind {{name}}",
+      "newName": "Name of the new kind"
     },
     "templates": {
       "title": "Templates",
@@ -355,7 +363,8 @@
     "title": "Photo",
     "delete": "Delete",
     "makeCover": "Make cover",
-    "original": "Original"
+    "original": "Original",
+    "open": "Photo {{n}} of {{count}}"
   },
   "picker": {
     "search": "Search places",
@@ -455,7 +464,20 @@
     "color": "Colour",
     "mergeHint": "Giving it another tag’s name merges the two.",
     "deleteTitle": "Delete “{{name}}”?",
-    "deleteBody": "The tag is taken off every thing. The things stay."
+    "deleteBody": "The tag is taken off every thing. The things stay.",
+    "colors": {
+      "slate": "Grey",
+      "red": "Red",
+      "orange": "Orange",
+      "amber": "Amber",
+      "lime": "Lime",
+      "green": "Green",
+      "teal": "Teal",
+      "sky": "Sky blue",
+      "blue": "Blue",
+      "violet": "Violet",
+      "pink": "Pink"
+    }
   },
   "documents": {
     "title": "Documents",

@@ -11,6 +11,8 @@ export const applyTheme = (theme: Theme) => {
   }
   const dark = theme === "dark" || (theme === "system" && media().matches);
   document.documentElement.classList.toggle("dark", dark);
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="color-scheme"]');
+  if (meta) meta.content = theme === "system" ? "light dark" : theme;
 };
 
 /** Keeps "system" in sync when the OS theme changes. */

@@ -82,7 +82,7 @@ const read = (dir, exts) =>
     .join("\n");
 const sources = read(join(web, "src"), [".ts", ".tsx"]) + read(join(web, "..", "internal"), [".go"]);
 // Keys built at runtime, e.g. t(`status.${s}`).
-const DYNAMIC = ["kinds.", "sheets.", "signIn.", "documentKinds.", "fieldTypes."];
+const DYNAMIC = ["kinds.", "sheets.", "signIn.", "documentKinds.", "fieldTypes.", "tags.colors."];
 for (const base of groups.keys()) {
   if (DYNAMIC.some((p) => base.startsWith(p))) continue;
   const short = base.split(".").pop();

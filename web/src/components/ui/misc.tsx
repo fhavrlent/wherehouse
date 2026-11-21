@@ -1,6 +1,7 @@
 import * as S from "@radix-ui/react-switch";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { useField } from "./field";
 
 export const Switch = ({
   checked,
@@ -12,17 +13,21 @@ export const Switch = ({
   onCheckedChange: (v: boolean) => void;
   id?: string;
   disabled?: boolean;
-}) => (
-  <S.Root
-    id={id}
-    checked={checked}
-    disabled={disabled}
-    onCheckedChange={onCheckedChange}
-    className="relative h-5 w-9 shrink-0 cursor-pointer rounded-full bg-border-strong transition-colors disabled:opacity-50 data-[state=checked]:bg-primary"
-  >
-    <S.Thumb className="block size-4 translate-x-0.5 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-[18px]" />
-  </S.Root>
-);
+}) => {
+  const field = useField();
+  return (
+    <S.Root
+      id={id ?? field?.id}
+      aria-describedby={id ? undefined : field?.describedBy}
+      checked={checked}
+      disabled={disabled}
+      onCheckedChange={onCheckedChange}
+      className="relative h-5 w-9 shrink-0 cursor-pointer rounded-full bg-border-strong transition-colors disabled:opacity-50 data-[state=checked]:bg-primary"
+    >
+      <S.Thumb className="block size-4 translate-x-0.5 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-[18px]" />
+    </S.Root>
+  );
+};
 
 /** A compact segmented control. */
 export const Segmented = <T extends string>({
@@ -38,7 +43,11 @@ export const Segmented = <T extends string>({
   className?: string;
   size?: "sm" | "md";
 }) => (
-  <div role="radiogroup" className={cn("inline-flex w-fit rounded-lg bg-surface-3 p-0.5", className)}>
+  <div
+    role="radiogroup"
+    aria-labelledby={useField()?.labelId}
+    className={cn("inline-flex w-fit rounded-lg bg-surface-3 p-0.5", className)}
+  >
     {options.map((o) => (
       <button
         key={o.value}
