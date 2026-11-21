@@ -6,6 +6,7 @@ import type { Tag, TagColor } from "@/lib/api";
 import { useTags } from "@/lib/queries";
 import { useComposing } from "@/lib/ime";
 import { cn } from "@/lib/utils";
+import { useFieldProps } from "./ui/field";
 import { fieldBase } from "./ui/input";
 
 // Written out so Tailwind sees every class.
@@ -40,6 +41,7 @@ export const TagInput = ({ value, onChange }: { value: string[]; onChange: (tags
   const { data: all = [] } = useTags();
   const [text, setText] = useState("");
   const ime = useComposing();
+  const fieldProps = useFieldProps({});
   const add = (name: string) => {
     const n = name.trim().replace(/^#/, "");
     if (n && !value.some((v) => v.toLowerCase() === n.toLowerCase())) onChange([...value, n]);
@@ -76,6 +78,7 @@ export const TagInput = ({ value, onChange }: { value: string[]; onChange: (tags
           </span>
         ))}
         <input
+          {...fieldProps}
           value={text}
           onChange={(e) => {
             const v = e.target.value;

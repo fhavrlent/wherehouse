@@ -45,19 +45,20 @@ export const Photos = ({ id, photos }: { id: number; photos: Photo[] }) => {
         <button
           type="button"
           onClick={() => setShown(cover)}
-          aria-label={t("photos.title")}
+          aria-label={t("photos.open", { n: 1, count: photos.length })}
           className="aspect-video w-full cursor-zoom-in overflow-hidden rounded-2xl border border-border bg-surface-3 lg:aspect-[4/3]"
         >
-          <img src={photoUrl(cover.id, true)} alt="" className="size-full object-cover" />
+          {/* The largest picture on a thing's page: load it first. */}
+          <img src={photoUrl(cover.id, true)} alt="" fetchPriority="high" className="size-full object-cover" />
         </button>
       )}
       <div className={photos.length ? "grid grid-cols-4 gap-2" : undefined}>
-        {photos.slice(1).map((p) => (
+        {photos.slice(1).map((p, i) => (
           <button
             key={p.id}
             type="button"
             onClick={() => setShown(p)}
-            aria-label={t("photos.title")}
+            aria-label={t("photos.open", { n: i + 2, count: photos.length })}
             className="aspect-square cursor-zoom-in overflow-hidden rounded-xl bg-surface-3"
           >
             <img src={photoUrl(p.id, true)} alt="" loading="lazy" className="size-full object-cover" />

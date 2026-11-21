@@ -1,6 +1,10 @@
-import type { ComponentProps, ReactNode } from "react";
+import { useId, useMemo, type ComponentProps, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
+import { FieldContext, useFieldProps, type FieldIds } from "./field";
+
+/** Ends a Field for what is inside, e.g. a dialog opened from a control in it. */
+export const NoField = ({ children }: { children: ReactNode }) => <FieldContext value={null}>{children}</FieldContext>;
 
 export const fieldBase =
   "w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg shadow-card placeholder:text-fg-subtle " +
@@ -8,11 +12,15 @@ export const fieldBase =
   "disabled:opacity-60 aria-invalid:border-bad aria-invalid:focus:ring-bad/25";
 
 export const Input = ({ className, ...props }: ComponentProps<"input">) => (
-  <input className={cn(fieldBase, "h-9", className)} {...props} />
+  <input className={cn(fieldBase, "h-9", className)} {...props} {...useFieldProps(props)} />
 );
 
 export const Textarea = ({ className, ...props }: ComponentProps<"textarea">) => (
-  <textarea className={cn(fieldBase, "min-h-20 py-2 leading-relaxed", className)} {...props} />
+  <textarea
+    className={cn(fieldBase, "min-h-20 py-2 leading-relaxed", className)}
+    {...props}
+    {...useFieldProps(props)}
+  />
 );
 
 export const Field = ({
@@ -33,17 +41,32 @@ export const Field = ({
   optional?: boolean;
 }) => {
   const { t } = useTranslation();
+  const baseId = useId();
+  const id = htmlFor ?? `${baseId}-control`;
+  const labelId = `${baseId}-label`;
+  const noteId = `${baseId}-note`;
+  const noted = !!(error || hint);
+  const ids = useMemo<FieldIds>(
+    () => ({ id, labelId, describedBy: noted ? noteId : undefined, invalid: !!error }),
+    [id, labelId, noteId, noted, error],
+  );
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <label htmlFor={htmlFor} className="text-[13px] font-medium text-fg">
+      <label id={labelId} htmlFor={id} className="text-[13px] font-medium text-fg">
         {label}
-        {optional && <span className="ml-1 font-normal text-fg-subtle">{t("common.optional")}</span>}
+        {/* A space, not a margin, so screen readers don't run the words together. */}
+        {optional && <span className="font-normal text-fg-subtle"> {t("common.optional")}</span>}
       </label>
-      {children}
+      <FieldContext value={ids}>{children}</FieldContext>
       {error ? (
-        <p className="text-xs text-bad">{error}</p>
+        <p id={noteId} className="text-xs text-bad">
+          <span className="sr-only">{t("common.error")}: </span>
+          {error}
+        </p>
       ) : hint ? (
-        <p className="text-xs text-fg-subtle">{hint}</p>
+        <p id={noteId} className="text-xs text-fg-subtle">
+          {hint}
+        </p>
       ) : null}
     </div>
   );
@@ -58,6 +81,7 @@ export const Select = ({ className, children, ...props }: ComponentProps<"select
       className,
     )}
     {...props}
+    {...useFieldProps(props)}
   >
     {children}
   </select>

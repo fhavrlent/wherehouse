@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
+import { useField } from "@/components/ui/field";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { Card, Segmented } from "@/components/ui/misc";
 import { browserLanguage, LANGUAGES } from "@/i18n";
@@ -342,6 +343,7 @@ const Fields = () => {
             <li key={f.id} className="flex items-center gap-2">
               <Input
                 defaultValue={f.name}
+                aria-label={t("settings.fields.rename", { name: f.name })}
                 onBlur={(e) =>
                   e.target.value !== f.name && void run(() => api.updateField(f.id, e.target.value, f.position))
                 }
@@ -371,9 +373,15 @@ const Fields = () => {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t("settings.fields.namePlaceholder")}
+          aria-label={t("settings.fields.newName")}
           className="min-w-40 flex-1"
         />
-        <Select value={type} onChange={(e) => setType(e.target.value as FieldType)} className="w-36">
+        <Select
+          value={type}
+          onChange={(e) => setType(e.target.value as FieldType)}
+          aria-label={t("settings.fields.type")}
+          className="w-36"
+        >
           {FIELD_TYPES.map((ft) => (
             <option key={ft} value={ft}>
               {t(`fieldTypes.${ft}`)}
@@ -551,6 +559,7 @@ const Tokens = () => {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t("settings.tokens.namePlaceholder")}
+          aria-label={t("settings.tokens.name")}
         />
         <Button type="submit" variant="outline" disabled={!name.trim()}>
           {t("settings.tokens.create")}
@@ -615,7 +624,7 @@ const HouseholdSection = () => {
         </Field>
       </div>
       <Field label={t("settings.household.members")}>
-        <ul className="divide-y divide-border rounded-xl border border-border">
+        <Members>
           {h.members.map((m) => (
             <li key={m.userId} className="flex items-center gap-3 px-3 py-2 text-sm">
               <span className="min-w-0 flex-1">
@@ -626,6 +635,7 @@ const HouseholdSection = () => {
                 <Select
                   value={m.role}
                   onChange={(e) => run(() => api.setRole(m.userId, e.target.value as "owner" | "member"))}
+                  aria-label={t("settings.household.roleOf", { name: m.name || m.email })}
                   className="h-7 w-28 text-xs"
                 >
                   <option value="owner">{t("settings.household.owner")}</option>
@@ -648,7 +658,7 @@ const HouseholdSection = () => {
               )}
             </li>
           ))}
-        </ul>
+        </Members>
       </Field>
       <ConfirmDialog
         open={removing !== null}
@@ -777,6 +787,7 @@ const Kinds = () => {
             <Input
               key={`${k.id}-${k.name}`}
               defaultValue={kindName(k, t)}
+              aria-label={t("settings.kinds.rename", { name: kindName(k, t) })}
               onBlur={(e) => e.target.value !== kindName(k, t) && void update(k, { name: e.target.value })}
               className="min-w-0 flex-1"
             />
@@ -825,6 +836,7 @@ const Kinds = () => {
           value={newKind.name}
           onChange={(e) => setNewKind({ ...newKind, name: e.target.value })}
           placeholder={t("settings.kinds.namePlaceholder")}
+          aria-label={t("settings.kinds.newName")}
           className="min-w-0 flex-1"
         />
         <label className="flex shrink-0 items-center gap-2 text-xs text-fg-muted">
@@ -945,3 +957,10 @@ const ExportSection = () => {
     </Section>
   );
 };
+
+/** The people of a household, named by the field they are in. */
+const Members = ({ children }: { children: ReactNode }) => (
+  <ul aria-labelledby={useField()?.labelId} className="divide-y divide-border rounded-xl border border-border">
+    {children}
+  </ul>
+);

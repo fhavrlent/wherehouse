@@ -1,5 +1,5 @@
 import { Pencil, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { TagChip } from "@/components/Tags";
 import { Breadcrumbs, ThingList } from "@/components/Things";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog, Dialog } from "@/components/ui/dialog";
+import { useField } from "@/components/ui/field";
 import { Field, Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/misc";
 import { api, errorMessage, TAG_COLORS, type TagColor } from "@/lib/api";
@@ -89,11 +90,14 @@ export const TagPage = () => {
             <Input data-autofocus value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
           <Field label={t("tags.color")}>
-            <div className="flex flex-wrap gap-1.5">
+            <ColorChoice>
               {TAG_COLORS.map((c) => (
                 <button
                   key={c}
                   type="button"
+                  role="radio"
+                  aria-checked={color === c}
+                  aria-label={t(`tags.colors.${c}`)}
                   onClick={() => setColor(c)}
                   className={cn(
                     "cursor-pointer rounded-md",
@@ -103,7 +107,7 @@ export const TagPage = () => {
                   <TagChip tag={{ id: 0, name: name || tag.name, color: c }} link={false} />
                 </button>
               ))}
-            </div>
+            </ColorChoice>
           </Field>
         </div>
       </Dialog>
@@ -125,3 +129,10 @@ export const TagPage = () => {
     </div>
   );
 };
+
+/** The colours to choose from, named by the field they are in. */
+const ColorChoice = ({ children }: { children: ReactNode }) => (
+  <div role="radiogroup" aria-labelledby={useField()?.labelId} className="flex flex-wrap gap-1.5">
+    {children}
+  </div>
+);

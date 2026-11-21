@@ -5,7 +5,8 @@
     "close": "Zavřít",
     "dialog": "Dialog",
     "optional": "nepovinné",
-    "save": "Uložit"
+    "save": "Uložit",
+    "error": "Chyba"
   },
   "nav": {
     "things": "Věci",
@@ -98,7 +99,10 @@
       "description": "Další údaje, které může mít každá věc, třeba cena, datum nákupu nebo záruka do.",
       "delete": "Smazat {{name}}",
       "namePlaceholder": "Nové pole, např. Cena",
-      "add": "Přidat pole"
+      "add": "Přidat pole",
+      "rename": "Název pole {{name}}",
+      "newName": "Název nového pole",
+      "type": "Typ nového pole"
     },
     "import": {
       "title": "Import z HomeBoxu",
@@ -125,7 +129,8 @@
       "unused": "Zatím nepoužit",
       "delete": "Smazat {{name}}",
       "namePlaceholder": "Název, např. Warranteed",
-      "create": "Vytvořit token"
+      "create": "Vytvořit token",
+      "name": "Název nového tokenu"
     },
     "household": {
       "title": "Domácnost",
@@ -148,7 +153,8 @@
       "delete": "Smazat domácnost",
       "deleteTitle": "Smazat „{{name}}“?",
       "deleteBody": "Smažou se všechna místa, věci, fotky, dokumenty a štítky v ní a nepůjde je vrátit. Pokud si chcete nechat kopii, nejdřív ji exportujte. Dokumenty v Paperless tam zůstanou.",
-      "deleteHint": "Smazat jde jen domácnost, ve které nikdo jiný není."
+      "deleteHint": "Smazat jde jen domácnost, ve které nikdo jiný není.",
+      "roleOf": "Role uživatele {{name}}"
     },
     "kinds": {
       "title": "Druhy",
@@ -158,7 +164,9 @@
       "placeHint": "Ukazuje se jako místo",
       "delete": "Smazat {{name}}",
       "namePlaceholder": "Nový druh, např. Elektronářadí",
-      "add": "Přidat druh"
+      "add": "Přidat druh",
+      "rename": "Název druhu {{name}}",
+      "newName": "Název nového druhu"
     },
     "templates": {
       "title": "Šablony",
@@ -371,7 +379,8 @@
     "title": "Fotka",
     "delete": "Smazat",
     "makeCover": "Dát jako hlavní",
-    "original": "Originál"
+    "original": "Originál",
+    "open": "Fotka {{n}} z {{count}}"
   },
   "picker": {
     "search": "Hledat místa",
@@ -487,7 +496,20 @@
     "color": "Barva",
     "mergeHint": "Název jiného štítku je sloučí.",
     "deleteTitle": "Smazat „{{name}}“?",
-    "deleteBody": "Štítek zmizí ze všech věcí. Věci zůstanou."
+    "deleteBody": "Štítek zmizí ze všech věcí. Věci zůstanou.",
+    "colors": {
+      "slate": "Šedá",
+      "red": "Červená",
+      "orange": "Oranžová",
+      "amber": "Jantarová",
+      "lime": "Limetková",
+      "green": "Zelená",
+      "teal": "Tyrkysová",
+      "sky": "Nebesky modrá",
+      "blue": "Modrá",
+      "violet": "Fialová",
+      "pink": "Růžová"
+    }
   },
   "documents": {
     "title": "Dokumenty",
