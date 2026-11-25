@@ -485,7 +485,9 @@ export const api = {
   kinds: () => request<Kind[]>("GET", "/api/kinds"),
   createKind: (k: KindInput) => request<Kind>("POST", "/api/kinds", k),
   updateKind: (id: number, k: KindInput) => request<Kind>("PUT", `/api/kinds/${id}`, k),
-  deleteKind: (id: number) => request<undefined>("DELETE", `/api/kinds/${id}`),
+  /** moveTo is the kind what is of this one becomes. */
+  deleteKind: (id: number, moveTo?: number) =>
+    request<undefined>("DELETE", `/api/kinds/${id}${moveTo ? `?moveTo=${moveTo}` : ""}`),
   icons: () => request<CustomIcon[]>("GET", "/api/icons"),
   uploadIcon: (file: File) => {
     const fd = new FormData();

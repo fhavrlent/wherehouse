@@ -24,6 +24,7 @@ func (s *Server) createKind(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
+	in.UniqueName = true
 	k, err := s.store.CreateKind(r.Context(), household(r), in)
 	if err != nil {
 		fail(w, err)
@@ -41,6 +42,7 @@ func (s *Server) updateKind(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
+	in.UniqueName = true
 	k, err := s.store.UpdateKind(r.Context(), household(r), id, in)
 	if err != nil {
 		fail(w, err)
@@ -54,7 +56,16 @@ func (s *Server) deleteKind(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := s.store.DeleteKind(r.Context(), household(r), id); err != nil {
+	var moveTo int64
+	if v := r.URL.Query().Get("moveTo"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n <= 0 {
+			writeMsg(w, http.StatusBadRequest, "server.kindMissing", nil)
+			return
+		}
+		moveTo = n
+	}
+	if err := s.store.DeleteKind(r.Context(), household(r), id, moveTo); err != nil {
 		fail(w, err)
 		return
 	}
