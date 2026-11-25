@@ -8,7 +8,7 @@ import { Section } from "@/components/Things";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/misc";
 import { pathText, type Maintenance } from "@/lib/api";
-import { daysUntil } from "@/lib/dates";
+import { addMonths, daysUntil, today } from "@/lib/dates";
 import { useHousehold, useMaintenance } from "@/lib/queries";
 import { formatMoney } from "@/lib/utils";
 
@@ -37,7 +37,12 @@ export const MaintenancePage = () => {
   const overdue = within(-Infinity, -1);
   const soon = within(0, 30);
   const later = within(31, Infinity);
-  const done = shown.filter((m) => !m.nextDue && m.doneOn);
+  // Done in the last year, latest first; an entry done and due again counts
+  // here too. The API also sends older ones that are still scheduled.
+  const yearAgo = addMonths(today(), -12);
+  const done = shown
+    .filter((m) => m.doneOn && m.doneOn >= yearAgo)
+    .sort((a, b) => (b.doneOn ?? "").localeCompare(a.doneOn ?? "") || b.id - a.id);
   const spent = done.reduce((sum, m) => sum + (m.cost ?? 0), 0);
   const currency = household?.currency ?? "EUR";
 

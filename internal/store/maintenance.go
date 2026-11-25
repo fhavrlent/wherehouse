@@ -277,6 +277,7 @@ func (s *Store) CompleteMaintenance(ctx context.Context, hh, uid, id int64, in D
 	if err != nil {
 		return nil, nil, err
 	}
+	afterCompleteRead()
 	repeat := m.Repeat
 	if in.Repeat.Set {
 		repeat = in.Repeat.Value
@@ -293,21 +294,28 @@ func (s *Store) CompleteMaintenance(ctx context.Context, hh, uid, id int64, in D
 	}
 	doneID, nextID := id, int64(0)
 	err = s.withTx(ctx, func(tx *sql.Tx) error {
+		// Take the entry off the schedule only if it is still as it was read:
+		// of two people marking it done at once, the second is refused rather
+		// than adding a second next entry or overwriting the first's date.
+		res, err := tx.ExecContext(ctx, `
+			UPDATE maintenance SET next_due = NULL, repeat_every = NULL, repeat_unit = NULL, updated_at = ?
+			WHERE id = ? AND next_due = ? AND done_on IS ?`,
+			now(), id, *m.NextDue, m.DoneOn)
+		if err != nil {
+			return err
+		}
+		if n, err := res.RowsAffected(); err != nil {
+			return err
+		} else if n == 0 {
+			return invalid("maintenanceNotDue", nil)
+		}
 		if m.DoneOn == nil {
-			if _, err := tx.ExecContext(ctx, `
-				UPDATE maintenance SET done_on = ?, next_due = NULL, cost = ?, repeat_every = NULL, repeat_unit = NULL, updated_at = ? WHERE id = ?`,
-				*doneOn, cost, now(), id); err != nil {
+			if _, err := tx.ExecContext(ctx, `UPDATE maintenance SET done_on = ?, cost = ? WHERE id = ?`, *doneOn, cost, id); err != nil {
 				return err
 			}
 		} else {
 			// It was done before and due again: that earlier time stays as it
 			// was, and this time is an entry of its own.
-			if _, err := tx.ExecContext(ctx, `
-				UPDATE maintenance SET next_due = NULL, repeat_every = NULL, repeat_unit = NULL, updated_at = ? WHERE id = ?`,
-				now(), id); err != nil {
-				return err
-			}
-			var err error
 			if doneID, err = insertMaintenance(ctx, tx, uid, m.ThingID, MaintenanceInput{
 				Title: m.Title, DoneOn: doneOn, Notes: m.Notes, Cost: in.Cost,
 			}); err != nil {
@@ -340,6 +348,10 @@ func (s *Store) CompleteMaintenance(ctx context.Context, hh, uid, id int64, in D
 	}
 	return done, next, nil
 }
+
+// afterCompleteRead lets a test change an entry between CompleteMaintenance
+// reading it and writing.
+var afterCompleteRead = func() {}
 
 // DueMaintenance lists entries due on or before until (a date), soonest
 // first, for current things of a household.
