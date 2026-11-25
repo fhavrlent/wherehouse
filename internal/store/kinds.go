@@ -206,8 +206,38 @@ func (s *Store) UpdateKind(ctx context.Context, hh, id int64, in KindInput) (*Ki
 	return s.getKind(ctx, hh, id)
 }
 
-// DeleteKind deletes a kind nothing is of.
-func (s *Store) DeleteKind(ctx context.Context, hh, id int64) error {
+// CheckKindName refuses a name another kind of the household shows as,
+// ignoring case: a kind named so, or a built-in kind not renamed whose name
+// is that in any language. except is the kind being renamed, or 0.
+func (s *Store) CheckKindName(ctx context.Context, hh, except int64, name string) error {
+	name = strings.TrimSpace(name)
+	kinds, err := s.ListKinds(ctx, hh)
+	if err != nil {
+		return err
+	}
+	for _, k := range kinds {
+		if k.ID == except {
+			continue
+		}
+		names := []string{k.Name}
+		if k.Name == "" && k.Key != "" {
+			names = nil
+			for _, lang := range i18n.Languages() {
+				names = append(names, i18n.T(lang, "kinds."+k.Key, nil))
+			}
+		}
+		for _, n := range names {
+			if strings.EqualFold(n, name) {
+				return invalid("kindExists", i18n.Args{"name": name})
+			}
+		}
+	}
+	return nil
+}
+
+// DeleteKind deletes a kind. What is of it moves to the kind moveTo; with
+// moveTo 0, only a kind nothing is of can be deleted.
+func (s *Store) DeleteKind(ctx context.Context, hh, id, moveTo int64) error {
 	return s.withTx(ctx, func(tx *sql.Tx) error {
 		var key sql.NullString
 		var used int
@@ -222,11 +252,31 @@ func (s *Store) DeleteKind(ctx context.Context, hh, id int64) error {
 		switch {
 		case key.String == "thing":
 			return invalid("kindNeeded", nil)
-		case used > 0:
+		case used > 0 && moveTo == 0:
 			return invalid("kindUsed", i18n.Args{"count": used})
 		}
-		_, err = tx.ExecContext(ctx, `DELETE FROM kinds WHERE id = ?`, id)
-		return err
+		if moveTo != 0 {
+			var one int
+			if err := tx.QueryRowContext(ctx, `SELECT 1 FROM kinds WHERE id = ? AND household_id = ? AND id != ?`, moveTo, hh, id).
+				Scan(&one); err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return invalid("kindMissing", nil)
+				}
+				return err
+			}
+			// Apps reading the changes see each moved thing as changed.
+			if _, err := tx.ExecContext(ctx, `UPDATE things SET kind_id = ?, updated_at = ? WHERE kind_id = ?`, moveTo, now(), id); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM kinds WHERE id = ?`, id); err != nil {
+			return err
+		}
+		if used > 0 {
+			// Search finds things by their kind's name.
+			return s.reindexAll(ctx, tx, hh)
+		}
+		return nil
 	})
 }
 

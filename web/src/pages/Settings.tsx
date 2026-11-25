@@ -17,7 +17,7 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/dialog";
+import { ConfirmDialog, Dialog } from "@/components/ui/dialog";
 import { useField } from "@/components/ui/field";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { Card, Segmented } from "@/components/ui/misc";
@@ -753,6 +753,7 @@ const Kinds = () => {
   const invalidate = useInvalidate();
   const { data: kinds = [] } = useKinds();
   const [picking, setPicking] = useState<Kind | "new" | null>(null);
+  const [deleting, setDeleting] = useState<Kind | null>(null);
   const [newKind, setNewKind] = useState({ name: "", icon: "shapes", isPlace: false });
   const run = async (fn: () => Promise<unknown>) => {
     try {
@@ -788,7 +789,14 @@ const Kinds = () => {
               key={`${k.id}-${k.name}`}
               defaultValue={kindName(k, t)}
               aria-label={t("settings.kinds.rename", { name: kindName(k, t) })}
-              onBlur={(e) => e.target.value !== kindName(k, t) && void update(k, { name: e.target.value })}
+              onBlur={(e) => {
+                const input = e.target;
+                if (input.value === kindName(k, t)) return;
+                // A refused name, e.g. one another kind has, goes back to what it was.
+                void update(k, { name: input.value }).then((ok) => {
+                  if (!ok) input.value = kindName(k, t);
+                });
+              }}
               className="min-w-0 flex-1"
             />
             <label
@@ -807,8 +815,8 @@ const Kinds = () => {
               variant="ghost"
               size="icon"
               aria-label={t("settings.kinds.delete", { name: kindName(k, t) })}
-              disabled={k.count > 0 || k.key === "thing"}
-              onClick={() => run(() => api.deleteKind(k.id))}
+              disabled={k.key === "thing"}
+              onClick={() => (k.count > 0 ? setDeleting(k) : run(() => api.deleteKind(k.id)))}
             >
               <Trash2 />
             </Button>
@@ -847,6 +855,7 @@ const Kinds = () => {
           {t("settings.kinds.add")}
         </Button>
       </form>
+      <DeleteKindDialog kind={deleting} kinds={kinds} onClose={() => setDeleting(null)} />
       <IconPicker
         open={picking !== null}
         onOpenChange={(o) => !o && setPicking(null)}
@@ -857,6 +866,70 @@ const Kinds = () => {
         }}
       />
     </Section>
+  );
+};
+
+/**
+ * Deletes a kind things are of, moving them to another kind first. A kind
+ * shown under the same name is offered first, to merge two kinds named alike.
+ */
+const DeleteKindDialog = ({ kind, kinds, onClose }: { kind: Kind | null; kinds: Kind[]; onClose: () => void }) => {
+  const { t } = useTranslation();
+  const invalidate = useInvalidate();
+  const [moveTo, setMoveTo] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [shown, setShown] = useState<Kind | null>(null);
+  const others = kinds.filter((k) => k.id !== kind?.id);
+  if (kind !== shown) {
+    setShown(kind);
+    if (kind) {
+      const name = kindName(kind, t).toLocaleLowerCase();
+      const same = others.find((k) => kindName(k, t).toLocaleLowerCase() === name);
+      const fallback = others.find((k) => k.isPlace === kind.isPlace) ?? others[0];
+      setMoveTo(String((same ?? fallback)?.id ?? ""));
+    }
+  }
+  const remove = async () => {
+    if (!kind || !moveTo) return;
+    setSaving(true);
+    try {
+      await api.deleteKind(kind.id, Number(moveTo));
+      onClose();
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setSaving(false);
+      invalidate();
+    }
+  };
+  const name = kind ? kindName(kind, t) : "";
+  return (
+    <Dialog
+      open={kind !== null}
+      onOpenChange={(o) => !o && onClose()}
+      title={t("settings.kinds.delete", { name })}
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button variant="danger" onClick={remove} loading={saving} disabled={!moveTo}>
+            <Trash2 /> {t("settings.kinds.moveAndDelete")}
+          </Button>
+        </>
+      }
+    >
+      <Field label={t("settings.kinds.moveTo", { count: kind?.count ?? 0, name })}>
+        <Select value={moveTo} onChange={(e) => setMoveTo(e.target.value)}>
+          {others.map((k) => (
+            <option key={k.id} value={k.id}>
+              {kindName(k, t)}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    </Dialog>
   );
 };
 

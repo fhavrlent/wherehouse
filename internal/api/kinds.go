@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/fhavrlent/wherehouse/internal/i18n"
 	"github.com/fhavrlent/wherehouse/internal/store"
@@ -24,6 +25,12 @@ func (s *Server) createKind(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
+	// Checked here rather than in the store, so a backup or import with two
+	// kinds of one name still comes in.
+	if err := s.store.CheckKindName(r.Context(), household(r), 0, in.Name); err != nil {
+		fail(w, err)
+		return
+	}
 	k, err := s.store.CreateKind(r.Context(), household(r), in)
 	if err != nil {
 		fail(w, err)
@@ -41,6 +48,12 @@ func (s *Server) updateKind(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
+	// A kind keeps a name it already has, so one of two kinds named alike can
+	// still get a new icon; a new name must be free.
+	if err := s.checkRename(r, id, in.Name); err != nil {
+		fail(w, err)
+		return
+	}
 	k, err := s.store.UpdateKind(r.Context(), household(r), id, in)
 	if err != nil {
 		fail(w, err)
@@ -54,11 +67,37 @@ func (s *Server) deleteKind(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := s.store.DeleteKind(r.Context(), household(r), id); err != nil {
+	var moveTo int64
+	if v := r.URL.Query().Get("moveTo"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n <= 0 {
+			writeMsg(w, http.StatusBadRequest, "server.kindMissing", nil)
+			return
+		}
+		moveTo = n
+	}
+	if err := s.store.DeleteKind(r.Context(), household(r), id, moveTo); err != nil {
 		fail(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) checkRename(r *http.Request, id int64, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil
+	}
+	kinds, err := s.store.ListKinds(r.Context(), household(r))
+	if err != nil {
+		return err
+	}
+	for _, k := range kinds {
+		if k.ID == id && strings.EqualFold(k.Name, name) {
+			return nil
+		}
+	}
+	return s.store.CheckKindName(r.Context(), household(r), id, name)
 }
 
 // maxIconBytes is the largest custom icon; icons are shown small.

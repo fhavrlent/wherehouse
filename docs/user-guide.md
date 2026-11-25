@@ -99,7 +99,7 @@ To get a message when maintenance is due, add notification URLs under **Settings
 ## Tags, kinds and custom fields
 
 - **Tags** are free-form. Clicking one lists its things; there you can rename it, change its colour, or delete it. Giving a tag the name of another merges the two.
-- **Kinds** say what things are. Add your own under **Settings → Kinds** with an icon from about 140, or upload one, and say whether they're places.
+- **Kinds** say what things are. Add your own under **Settings → Kinds** with an icon from about 140, or upload one, and say whether they're places. Each kind has a name of its own. Deleting a kind that things are of asks which kind they become; pick the other one to merge two kinds named alike.
 - **Custom fields** under **Settings → Custom fields** are extra details every thing can have: text, a number, a date, a link, or yes/no.
 
 ## Copies and templates

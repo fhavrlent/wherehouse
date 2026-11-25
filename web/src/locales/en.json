@@ -158,7 +158,10 @@
       "namePlaceholder": "New kind, e.g. Power tool",
       "add": "Add kind",
       "rename": "Name of the kind {{name}}",
-      "newName": "Name of the new kind"
+      "newName": "Name of the new kind",
+      "moveTo_one": "{{count}} thing is of the kind {{name}}. Make it:",
+      "moveTo_other": "{{count}} things are of the kind {{name}}. Make them:",
+      "moveAndDelete": "Move and delete"
     },
     "templates": {
       "title": "Templates",
@@ -284,7 +287,8 @@
     "backupFileTooLarge": "A file in the backup is larger than {{mb}} MB",
     "connectedAppOnly": "Only the token of a connected app can do this",
     "paperlessCantEdit": "Paperless doesn’t let your token change documents",
-    "paperlessFieldType": "The Paperless custom field “{{name}}” exists but isn’t a URL field"
+    "paperlessFieldType": "The Paperless custom field “{{name}}” exists but isn’t a URL field",
+    "kindExists": "There’s already a kind called {{name}}"
   },
   "signIn": {
     "unreachable": "Could not reach the identity provider. Try again in a moment.",
