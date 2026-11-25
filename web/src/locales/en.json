@@ -14,7 +14,8 @@
     "add": "Add",
     "labels": "Labels",
     "scan": "Scan a label",
-    "report": "Value"
+    "report": "Value",
+    "maintenance": "Maintenance"
   },
   "account": {
     "menu": "Account",
@@ -284,7 +285,10 @@
     "backupFileTooLarge": "A file in the backup is larger than {{mb}} MB",
     "connectedAppOnly": "Only the token of a connected app can do this",
     "paperlessCantEdit": "Paperless doesn’t let your token change documents",
-    "paperlessFieldType": "The Paperless custom field “{{name}}” exists but isn’t a URL field"
+    "paperlessFieldType": "The Paperless custom field “{{name}}” exists but isn’t a URL field",
+    "maintenanceRepeat": "Repeat every 1–520 weeks or 1–120 months",
+    "maintenanceDoneOn": "Give the date it was done",
+    "maintenanceNotDue": "Only what is due can be marked done"
   },
   "signIn": {
     "unreachable": "Could not reach the identity provider. Try again in a moment.",
@@ -522,13 +526,22 @@
     "whatPlaceholder": "e.g. Yearly service, Replace filter",
     "doneOn": "Done on",
     "nextDue": "Next due",
-    "inMonths_one": "+{{count}} month",
-    "inMonths_other": "+{{count}} months",
     "cost": "Cost",
     "notes": "Notes",
     "doneTitle": "Done: {{title}}",
-    "repeat": "When is it due again?",
-    "noRepeat": "Not again"
+    "repeats": "Repeats",
+    "noRepeatOption": "Doesn’t repeat",
+    "everyWeek_one": "Every week",
+    "everyWeek_other": "Every {{count}} weeks",
+    "everyMonth_one": "Every month",
+    "everyMonth_other": "Every {{count}} months",
+    "everyYear_one": "Every year",
+    "everyYear_other": "Every {{count}} years",
+    "repeatHint": "Marking it done logs it and adds the next one this long after.",
+    "doneDate": "Done on",
+    "doneCost": "Cost",
+    "repeatNext": "Next time",
+    "nextAdded": "Next due {{date}}"
   },
   "links": {
     "title": "Links",
@@ -658,5 +671,17 @@
     "none": "This document isn’t on anything here.",
     "otherHousehold": "It’s also on things in “{{name}}”, another of your households.",
     "elsewhere": "It’s on things in “{{name}}”, another of your households."
+  },
+  "maintenancePage": {
+    "title": "Maintenance",
+    "filter": "Filter by task or thing",
+    "overdue": "Overdue",
+    "soon": "Next 30 days",
+    "later": "Later",
+    "done": "Done in the last year",
+    "doneTotal": "{{total}} spent",
+    "empty": "Nothing scheduled. Add maintenance on a thing’s page, e.g. swapping tyres every 6 months or a filter every year.",
+    "noMatch": "Nothing matches.",
+    "showAll": "Show all"
   }
 }

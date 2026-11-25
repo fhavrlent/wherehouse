@@ -95,3 +95,102 @@ func TestNotificationSettings(t *testing.T) {
 		t.Errorf("settings = %+v", got)
 	}
 }
+
+// A repeating task keeps its repeat through changes that don't mention it,
+// as an app's do, and marking it done logs it and adds the next one.
+func TestRepeatingMaintenance(t *testing.T) {
+	h, c := newTestServer(t)
+	car := add(t, h, c, `{"name":"Car"}`)
+	m := decodeAs[store.Maintenance](t, mustCall(t, h, c, "POST", fmt.Sprintf("/api/things/%d/maintenance", car.ID),
+		`{"title":"Swap tyres","nextDue":"2026-04-15","notes":"Garage on Main St","repeat":{"every":6,"unit":"month"}}`, 201))
+	if m.Repeat == nil || *m.Repeat != (store.Repeat{Every: 6, Unit: "month"}) {
+		t.Fatalf("repeat = %+v", m.Repeat)
+	}
+	for _, bad := range []string{`{"every":0,"unit":"month"}`, `{"every":2,"unit":"day"}`, `{"every":121,"unit":"month"}`} {
+		mustCall(t, h, c, "PUT", fmt.Sprintf("/api/maintenance/%d", m.ID), `{"title":"Swap tyres","nextDue":"2026-04-15","repeat":`+bad+`}`, 400)
+	}
+	m = decodeAs[store.Maintenance](t, mustCall(t, h, c, "PUT", fmt.Sprintf("/api/maintenance/%d", m.ID),
+		`{"title":"Swap tyres","nextDue":"2026-04-20","notes":"Garage on Main St"}`, 200))
+	if m.Repeat == nil || m.Repeat.Every != 6 {
+		t.Fatalf("repeat after a change without it = %+v", m.Repeat)
+	}
+
+	res := decodeAs[struct{ Done, Next *store.Maintenance }](t, mustCall(t, h, c, "POST", fmt.Sprintf("/api/maintenance/%d/done", m.ID),
+		`{"doneOn":"2026-04-18","cost":40}`, 200))
+	if d := res.Done; d.DoneOn == nil || *d.DoneOn != "2026-04-18" || d.NextDue != nil || d.Repeat != nil || d.Cost == nil || *d.Cost != 40 {
+		t.Errorf("done = %+v", d)
+	}
+	if n := res.Next; n == nil || n.NextDue == nil || *n.NextDue != "2026-10-18" || n.Repeat == nil || n.Notes != "Garage on Main St" || n.Cost != nil {
+		t.Fatalf("next = %+v", n)
+	}
+
+	// Changing the repeat while marking done, or stopping it.
+	res = decodeAs[struct{ Done, Next *store.Maintenance }](t, mustCall(t, h, c, "POST", fmt.Sprintf("/api/maintenance/%d/done", res.Next.ID),
+		`{"doneOn":"2026-10-20","repeat":{"every":2,"unit":"week"}}`, 200))
+	if n := res.Next; n == nil || *n.NextDue != "2026-11-03" || n.Repeat.Unit != "week" {
+		t.Fatalf("next weekly = %+v", n)
+	}
+	res = decodeAs[struct{ Done, Next *store.Maintenance }](t, mustCall(t, h, c, "POST", fmt.Sprintf("/api/maintenance/%d/done", res.Next.ID),
+		`{"doneOn":"2026-11-03","repeat":null}`, 200))
+	if res.Next != nil {
+		t.Errorf("next after stopping = %+v", res.Next)
+	}
+	mustCall(t, h, c, "POST", fmt.Sprintf("/api/maintenance/%d/done", res.Done.ID), `{"doneOn":""}`, 400)
+
+	got := decodeAs[thingResponse](t, mustCall(t, h, c, "GET", fmt.Sprintf("/api/things/%d", car.ID), "", 200))
+	if len(got.Maintenance) != 3 {
+		t.Errorf("log = %+v", got.Maintenance)
+	}
+}
+
+func TestHouseholdMaintenance(t *testing.T) {
+	h, c := newTestServer(t)
+	car := add(t, h, c, `{"name":"Car"}`)
+	sold := add(t, h, c, `{"name":"Old bike","soldDate":"2026-01-01"}`)
+	day := func(n int) string { return time.Now().AddDate(0, 0, n).Format(store.DateLayout) }
+	for _, e := range []string{
+		fmt.Sprintf(`{"title":"Cabin filter","nextDue":%q}`, day(400)),
+		fmt.Sprintf(`{"title":"Oil","nextDue":%q}`, day(-2)),
+		fmt.Sprintf(`{"title":"Wipers","doneOn":%q}`, day(-30)),
+		fmt.Sprintf(`{"title":"Battery","doneOn":%q}`, day(-500)),
+	} {
+		mustCall(t, h, c, "POST", fmt.Sprintf("/api/things/%d/maintenance", car.ID), e, 201)
+	}
+	mustCall(t, h, c, "POST", fmt.Sprintf("/api/things/%d/maintenance", sold.ID), fmt.Sprintf(`{"title":"Chain","nextDue":%q}`, day(1)), 201)
+
+	list := decodeAs[[]store.Maintenance](t, mustCall(t, h, c, "GET", "/api/maintenance", "", 200))
+	var titles []string
+	for _, m := range list {
+		titles = append(titles, m.Title)
+	}
+	if fmt.Sprint(titles) != "[Oil Cabin filter Wipers]" || list[0].ThingName != "Car" {
+		t.Errorf("list = %v", titles)
+	}
+	if all := decodeAs[[]store.Maintenance](t, mustCall(t, h, c, "GET", "/api/maintenance?doneDays=1000", "", 200)); len(all) != 4 {
+		t.Errorf("with a longer history = %d entries", len(all))
+	}
+}
+
+// An entry done once and due again keeps the first time when it's done again.
+func TestCompleteKeepsEarlierDone(t *testing.T) {
+	h, c := newTestServer(t)
+	boiler := add(t, h, c, `{"name":"Boiler"}`)
+	m := decodeAs[store.Maintenance](t, mustCall(t, h, c, "POST", fmt.Sprintf("/api/things/%d/maintenance", boiler.ID),
+		`{"title":"Service","doneOn":"2025-10-01","nextDue":"2026-10-01","cost":90,"repeat":{"every":12,"unit":"month"}}`, 201))
+	res := decodeAs[struct{ Done, Next *store.Maintenance }](t, mustCall(t, h, c, "POST", fmt.Sprintf("/api/maintenance/%d/done", m.ID),
+		`{"doneOn":"2026-10-05","cost":95}`, 200))
+	if res.Done.ID == m.ID || *res.Done.DoneOn != "2026-10-05" || *res.Done.Cost != 95 || res.Next == nil || *res.Next.NextDue != "2027-10-05" {
+		t.Fatalf("done = %+v, next = %+v", res.Done, res.Next)
+	}
+	first := decodeAs[thingResponse](t, mustCall(t, h, c, "GET", fmt.Sprintf("/api/things/%d", boiler.ID), "", 200)).Maintenance
+	if len(first) != 3 {
+		t.Fatalf("log = %+v", first)
+	}
+	for _, e := range first {
+		if e.ID == m.ID && (*e.DoneOn != "2025-10-01" || *e.Cost != 90 || e.NextDue != nil) {
+			t.Errorf("first time = %+v", e)
+		}
+	}
+	// Only what is due can be marked done.
+	mustCall(t, h, c, "POST", fmt.Sprintf("/api/maintenance/%d/done", m.ID), `{"doneOn":"2026-10-06"}`, 400)
+}

@@ -94,6 +94,12 @@ export interface Attachment {
   createdAt: string;
 }
 
+/** How often a maintenance task comes back. */
+export interface Repeat {
+  every: number;
+  unit: "week" | "month";
+}
+
 export interface Maintenance {
   id: number;
   thingId: number;
@@ -102,14 +108,22 @@ export interface Maintenance {
   nextDue: string | null;
   notes: string;
   cost: number | null;
+  repeat: Repeat | null;
   createdAt: string;
   updatedAt: string;
-  /** In lists of what is due. */
+  /** In lists across things. */
   thingName?: string;
   path?: Ref[];
 }
 
-export type MaintenanceInput = Pick<Maintenance, "title" | "doneOn" | "nextDue" | "notes" | "cost">;
+export type MaintenanceInput = Pick<Maintenance, "title" | "doneOn" | "nextDue" | "notes" | "cost" | "repeat">;
+
+export interface DoneInput {
+  doneOn: string;
+  cost: number | null;
+  /** The next entry's repeat; null for none. */
+  repeat: Repeat | null;
+}
 
 export interface Link {
   id: number;
@@ -533,6 +547,9 @@ export const api = {
     request<Attachment>("PATCH", `/api/attachments/${id}`, { kind, filename }),
   deleteAttachment: (id: number) => request<undefined>("DELETE", `/api/attachments/${id}`),
 
+  householdMaintenance: () => request<Maintenance[]>("GET", "/api/maintenance"),
+  completeMaintenance: (id: number, d: DoneInput) =>
+    request<{ done: Maintenance; next: Maintenance | null }>("POST", `/api/maintenance/${id}/done`, d),
   dueMaintenance: (days = 30) => request<Maintenance[]>("GET", `/api/maintenance/due?days=${days}`),
   addMaintenance: (thingId: number, m: MaintenanceInput) =>
     request<Maintenance>("POST", `/api/things/${thingId}/maintenance`, m),

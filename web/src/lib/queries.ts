@@ -23,6 +23,7 @@ export const keys = {
   kinds: ["kinds"] as const,
   icons: ["icons"] as const,
   due: ["due"] as const,
+  maintenance: ["maintenance"] as const,
   households: ["households"] as const,
   household: ["household"] as const,
 };
@@ -66,6 +67,7 @@ export const useInvalidate = () => {
       keys.things,
       keys.tags,
       keys.due,
+      keys.maintenance,
       keys.kinds,
       ["thing"],
       ["tag"],
@@ -94,5 +96,8 @@ export const useFields = () => useQuery({ queryKey: keys.fields, queryFn: api.fi
 
 /** Maintenance due within 30 days, and overdue. */
 export const useDue = () => useQuery({ queryKey: keys.due, queryFn: () => api.dueMaintenance(30) });
+
+/** Everything scheduled in the household, and what was done in the last year. */
+export const useMaintenance = () => useQuery({ queryKey: keys.maintenance, queryFn: api.householdMaintenance });
 
 export const useTemplates = () => useQuery({ queryKey: ["things", "templates"], queryFn: api.templates });

@@ -27,7 +27,7 @@ Self-hosted home inventory: what you own, where it is, and what's in that box.
 - Search finds things by any word of their name, details, tags, custom fields, label code or the places they're in, as you type. Diacritics don't matter.
 - QR labels for boxes, shelves and things, printed on common label sheets or a label printer. Scanning one (in the app, or with a phone's camera) opens its page. Blank labels can be printed ahead and attached when first scanned.
 - Purchase date, price, seller, warranty, insurance and sale for every thing; the Value page totals what things cost, by place, kind and tag, and prints an insurance list.
-- A maintenance log for every thing, with reminders through ntfy, Gotify, Discord, Telegram, email and other services.
+- A maintenance log for every thing, with tasks that repeat (tyres every 6 months, a filter every year), a page of everything due, and reminders through ntfy, Gotify, Discord, Telegram, email and other services.
 - Documents stored here or linked from Paperless-ngx, with links back from Paperless to the thing.
 - Purchases and warranties kept in step with [Warranteed](https://github.com/fhavrlent/warranteed), its sibling app for warranty tracking.
 - Kinds with about 140 icons (or your own), tags, custom fields, copies and templates.

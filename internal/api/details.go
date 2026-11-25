@@ -173,6 +173,42 @@ func (s *Server) deleteMaintenance(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// completeMaintenance logs an entry as done and adds the next one if it
+// repeats.
+func (s *Server) completeMaintenance(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var in store.DoneInput
+	if !decode(w, r, &in) {
+		return
+	}
+	done, next, err := s.store.CompleteMaintenance(r.Context(), household(r), userID(r), id, in)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"done": done, "next": next})
+}
+
+// householdMaintenance lists everything scheduled in the household, and
+// what was done in the last ?doneDays (default 365) days.
+func (s *Server) householdMaintenance(w http.ResponseWriter, r *http.Request) {
+	days := 365
+	if v, err := strconv.Atoi(r.URL.Query().Get("doneDays")); err == nil && v >= 0 && v <= 3650 {
+		days = v
+	}
+	y, m, d := time.Now().In(s.cfg.Location).Date()
+	since := time.Date(y, m, d, 0, 0, 0, 0, time.UTC).AddDate(0, 0, -days).Format(store.DateLayout)
+	list, err := s.store.HouseholdMaintenance(r.Context(), household(r), since)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, 200, list)
+}
+
 // dueMaintenance lists what is due within ?days (default 30) days, and
 // anything overdue.
 func (s *Server) dueMaintenance(w http.ResponseWriter, r *http.Request) {

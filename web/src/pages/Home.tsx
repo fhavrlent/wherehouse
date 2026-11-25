@@ -65,7 +65,14 @@ export const Home = () => {
       ) : (
         <>
           {due.length > 0 && (
-            <Section title={t("home.due")}>
+            <Section
+              title={t("home.due")}
+              action={
+                <Link to="/maintenance" className="text-xs font-medium text-primary hover:underline">
+                  {t("maintenancePage.showAll")}
+                </Link>
+              }
+            >
               <DueList entries={due} />
             </Section>
           )}

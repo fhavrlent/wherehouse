@@ -14,7 +14,8 @@
     "add": "Přidat",
     "labels": "Štítky",
     "scan": "Načíst štítek",
-    "report": "Hodnota"
+    "report": "Hodnota",
+    "maintenance": "Údržba"
   },
   "account": {
     "menu": "Účet",
@@ -298,7 +299,10 @@
     "backupFileTooLarge": "Soubor v záloze je větší než {{mb}} MB",
     "connectedAppOnly": "Tohle může jen token připojené aplikace",
     "paperlessCantEdit": "Paperless nedovolí vašemu tokenu měnit dokumenty",
-    "paperlessFieldType": "Vlastní pole „{{name}}“ v Paperless existuje, ale není typu URL"
+    "paperlessFieldType": "Vlastní pole „{{name}}“ v Paperless existuje, ale není typu URL",
+    "maintenanceRepeat": "Opakování může být každých 1–520 týdnů nebo 1–120 měsíců",
+    "maintenanceDoneOn": "Zadejte, kdy se to udělalo",
+    "maintenanceNotDue": "Hotové jde označit jen to, co má termín"
   },
   "signIn": {
     "unreachable": "Poskytovatel identity není dostupný. Zkuste to za chvíli znovu.",
@@ -558,15 +562,28 @@
     "whatPlaceholder": "např. Roční servis, Výměna filtru",
     "doneOn": "Hotovo dne",
     "nextDue": "Příští termín",
-    "inMonths_one": "+{{count}} měsíc",
-    "inMonths_few": "+{{count}} měsíce",
-    "inMonths_many": "+{{count}} měsíce",
-    "inMonths_other": "+{{count}} měsíců",
     "cost": "Cena",
     "notes": "Poznámky",
     "doneTitle": "Hotovo: {{title}}",
-    "repeat": "Kdy to bude potřeba znovu?",
-    "noRepeat": "Už ne"
+    "repeats": "Opakuje se",
+    "noRepeatOption": "Neopakuje se",
+    "everyWeek_one": "Každý týden",
+    "everyWeek_few": "Každé {{count}} týdny",
+    "everyWeek_many": "Každých {{count}} týdne",
+    "everyWeek_other": "Každých {{count}} týdnů",
+    "everyMonth_one": "Každý měsíc",
+    "everyMonth_few": "Každé {{count}} měsíce",
+    "everyMonth_many": "Každých {{count}} měsíce",
+    "everyMonth_other": "Každých {{count}} měsíců",
+    "everyYear_one": "Každý rok",
+    "everyYear_few": "Každé {{count}} roky",
+    "everyYear_many": "Každých {{count}} roku",
+    "everyYear_other": "Každých {{count}} let",
+    "repeatHint": "Když to označíte jako hotové, zapíše se to a přidá se další termín za tuhle dobu.",
+    "doneDate": "Hotovo dne",
+    "doneCost": "Cena",
+    "repeatNext": "Příště",
+    "nextAdded": "Další termín {{date}}"
   },
   "links": {
     "title": "Odkazy",
@@ -706,5 +723,17 @@
     "none": "Tenhle dokument tu není u ničeho.",
     "otherHousehold": "Je i u věcí v „{{name}}“, jiné vaší domácnosti.",
     "elsewhere": "Je u věcí v „{{name}}“, jiné vaší domácnosti."
+  },
+  "maintenancePage": {
+    "title": "Údržba",
+    "filter": "Hledat úkol nebo věc",
+    "overdue": "Po termínu",
+    "soon": "Příštích 30 dní",
+    "later": "Později",
+    "done": "Hotovo za poslední rok",
+    "doneTotal": "utraceno {{total}}",
+    "empty": "Nic naplánovaného. Údržbu přidáte na stránce věci, třeba přezutí každého půl roku nebo filtr každý rok.",
+    "noMatch": "Nic neodpovídá.",
+    "showAll": "Zobrazit vše"
   }
 }

@@ -353,7 +353,7 @@ func (rs *restorer) restoreThing(ctx context.Context, t *store.Thing) error {
 	}
 	for _, m := range t.Maintenance {
 		nm, err := st.AddMaintenance(ctx, hh, rs.uid, nt.ID, store.MaintenanceInput{Title: m.Title, DoneOn: m.DoneOn,
-			NextDue: m.NextDue, Notes: m.Notes, Cost: m.Cost})
+			NextDue: m.NextDue, Notes: m.Notes, Cost: m.Cost, Repeat: store.RepeatField{Set: true, Value: m.Repeat}})
 		if err != nil {
 			return err
 		}

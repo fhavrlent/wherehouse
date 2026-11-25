@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Sun,
   Tags,
+  Wrench,
 } from "lucide-react";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -119,6 +120,7 @@ const Shell = ({ children }: { children: ReactNode }) => {
           </div>
           <nav className="hidden shrink-0 items-center gap-1 lg:flex">
             {nav("/", t("nav.things"))}
+            {nav("/maintenance", t("nav.maintenance"))}
             {nav("/report", t("nav.report"))}
             {nav("/labels", t("nav.labels"))}
             {nav("/settings", t("nav.settings"))}
@@ -151,6 +153,9 @@ const Shell = ({ children }: { children: ReactNode }) => {
                   <p className="truncate text-xs text-fg-subtle">{me?.email}</p>
                 </div>
                 <MenuSeparator />
+                <MenuItem icon={<Wrench />} onSelect={() => navigate("/maintenance")}>
+                  {t("nav.maintenance")}
+                </MenuItem>
                 <MenuItem icon={<BarChart3 />} onSelect={() => navigate("/report")}>
                   {t("nav.report")}
                 </MenuItem>
