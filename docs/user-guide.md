@@ -84,9 +84,11 @@ A thing linked to a warranty in Warranteed shows its purchase and warranty detai
 
 ## Maintenance and reminders
 
-Each thing has a **Maintenance** log: services, repairs and what's due next. An entry has what was done, when it was done and when it's next due (at least one of the two dates), and optionally a cost and notes.
+Each thing has a **Maintenance** log: services, repairs and what's due next. An entry has what was done, when it was done and when it's next due (at least one of the two dates), and optionally a cost, notes and how often it repeats, such as every 6 months for swapping tyres or every year for a filter.
 
-**Mark done** on a due entry logs it as done and asks when it's due again: in a few months, or not again. What's due soon or overdue is shown on the Things page.
+**Mark done** on a due entry asks the day it was done and what it cost, and logs it. If it repeats, the next one is added that long after; you can change the repeat or stop it there.
+
+The **Maintenance** page lists everything scheduled in the household: what's overdue, due in the next 30 days and later, each with **Mark done**, and what was done in the last year with what it cost. What's due soon or overdue is also shown on the Things page.
 
 To get a message when maintenance is due, add notification URLs under **Settings → Reminders**; see the [integration guide](integrations.md#reminders).
 

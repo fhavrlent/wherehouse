@@ -169,8 +169,10 @@ over the thing's purchase and warranty details.
 
 | | |
 | --- | --- |
-| `POST /api/things/{id}/maintenance` | Log something done or to do: `{title, doneOn, nextDue, notes, cost}`, at least one date. |
-| `PUT /api/maintenance/{id}`, `DELETE /api/maintenance/{id}` | Change or delete an entry. |
+| `POST /api/things/{id}/maintenance` | Log something done or to do: `{title, doneOn, nextDue, notes, cost, repeat}`, at least one date. `repeat` is how often it comes back, `{every, unit}` with `unit` `week` (1–520) or `month` (1–120), or `null`. |
+| `PUT /api/maintenance/{id}`, `DELETE /api/maintenance/{id}` | Change or delete an entry. A `PUT` without `repeat` keeps the one the entry has. |
+| `POST /api/maintenance/{id}/done` | Log a due entry as done: `{doneOn, cost, repeat}`. If it repeats, the next entry is added that long after `doneOn`, and the answer is `{done, next}`. `repeat` changes or, with `null`, stops the repeat; without it, the entry's own is used. An entry already done once keeps that date, and this time gets an entry of its own. |
+| `GET /api/maintenance?doneDays=365` | Everything with a due date in the household, soonest first, then what was done in that many days, latest first. |
 | `GET /api/maintenance/due?days=30` | What is due within that many days, and overdue. |
 
 ## Labels

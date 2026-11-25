@@ -34,7 +34,7 @@ Extract a shared module only when keeping two copies in sync starts to hurt.
 
 - Things that can hold other things, so a box is a thing; custom kinds with built-in or uploaded icons.
 - Search as you type, QR labels and label sheets, scanning.
-- Tags, custom fields, documents and Paperless, maintenance with reminders.
+- Tags, custom fields, documents and Paperless, maintenance with reminders, repeating tasks and a page of what's due.
 - Purchase, warranty, insurance and sale details; the Value page and insurance list.
 - Several households with invites; copying and templates; CSV and ZIP export.
 - API tokens, connecting other apps, app links, a change feed and pings. Warranteed uses all of these.

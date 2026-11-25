@@ -80,3 +80,20 @@ func TestPaperlessTokenIsEncrypted(t *testing.T) {
 		t.Errorf("with another key = %+v %v", s, err)
 	}
 }
+
+func TestRepeatAfter(t *testing.T) {
+	for _, c := range []struct {
+		r          Repeat
+		from, want string
+	}{
+		{Repeat{1, RepeatMonth}, "2026-01-31", "2026-02-28"},
+		{Repeat{1, RepeatMonth}, "2028-01-31", "2028-02-29"},
+		{Repeat{6, RepeatMonth}, "2026-08-31", "2027-02-28"},
+		{Repeat{12, RepeatMonth}, "2026-03-15", "2027-03-15"},
+		{Repeat{2, RepeatWeek}, "2026-12-25", "2027-01-08"},
+	} {
+		if got, err := c.r.After(c.from); err != nil || got != c.want {
+			t.Errorf("%+v after %s = %s, %v; want %s", c.r, c.from, got, err, c.want)
+		}
+	}
+}

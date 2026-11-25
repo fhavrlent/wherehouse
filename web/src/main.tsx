@@ -18,6 +18,7 @@ import {
   LabelPage,
   Labels,
   Login,
+  MaintenancePage,
   PlaceRedirect,
   Report,
   Scan,
@@ -57,6 +58,7 @@ createRoot(root).render(
                 <Route path="/archived" element={<ItemsPage show="archived" />} />
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/t/:id" element={<TagPage />} />
+                <Route path="/maintenance" element={<MaintenancePage />} />
                 <Route path="/report" element={<Report />} />
                 <Route path="/report/insurance" element={<InsuranceList />} />
                 <Route path="/labels" element={<Labels />} />

@@ -1,11 +1,12 @@
-import { CalendarClock, Check, Pencil, Plus, Trash2, Wrench } from "lucide-react";
+import { CalendarClock, Check, Pencil, Plus, Repeat as RepeatIcon, Trash2, Wrench } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { api, errorMessage, type Maintenance, type MaintenanceInput } from "@/lib/api";
-import { addMonths, daysUntil, today, useDueText } from "@/lib/dates";
+import { addRepeat, daysUntil, today, useDueText, useRepeatText } from "@/lib/dates";
 import { useInvalidate } from "@/lib/queries";
 import { cn } from "@/lib/utils";
+import { DoneDialog, RepeatSelect } from "./MaintenanceDone";
 import { Button } from "./ui/button";
 import { Dialog } from "./ui/dialog";
 import { Field, Input, Textarea } from "./ui/input";
@@ -16,6 +17,7 @@ export const MaintenanceLog = ({ thingId, entries }: { thingId: number; entries:
   const { t } = useTranslation();
   const invalidate = useInvalidate();
   const dueText = useDueText();
+  const repeatText = useRepeatText();
   const [editing, setEditing] = useState<Maintenance | "new" | null>(null);
   const [finishing, setFinishing] = useState<Maintenance | null>(null);
 
@@ -58,7 +60,15 @@ export const MaintenanceLog = ({ thingId, entries }: { thingId: number; entries:
                   {left === null ? <Wrench /> : <CalendarClock />}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{m.title}</p>
+                  <p className="flex items-center gap-1.5 text-sm font-medium">
+                    {m.title}
+                    {m.repeat && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-surface-3 px-1.5 py-0.5 text-[11px] font-normal text-fg-muted">
+                        <RepeatIcon className="size-3" aria-hidden />
+                        {repeatText(m.repeat)}
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-fg-subtle">
                     {[
                       m.nextDue && `${t("maintenance.due")} ${m.nextDue} (${dueText(m.nextDue)})`,
@@ -109,7 +119,7 @@ export const MaintenanceLog = ({ thingId, entries }: { thingId: number; entries:
   );
 };
 
-const empty: MaintenanceInput = { title: "", doneOn: null, nextDue: null, notes: "", cost: null };
+const empty: MaintenanceInput = { title: "", doneOn: null, nextDue: null, notes: "", cost: null, repeat: null };
 
 const EntryDialog = ({
   open,
@@ -198,18 +208,19 @@ const EntryDialog = ({
             />
           </Field>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {[3, 6, 12, 24].map((months) => (
-            <button
-              key={months}
-              type="button"
-              onClick={() => setForm({ ...form, nextDue: addMonths(form.doneOn ?? today(), months) })}
-              className="cursor-pointer rounded-md bg-surface-3 px-2 py-1 text-xs text-fg-muted hover:text-fg"
-            >
-              {t("maintenance.inMonths", { count: months })}
-            </button>
-          ))}
-        </div>
+        <Field label={t("maintenance.repeats")} optional hint={form.repeat ? t("maintenance.repeatHint") : undefined}>
+          <RepeatSelect
+            value={form.repeat}
+            onChange={(repeat) =>
+              // Picking a repeat also says when it's next due, if that's not set yet.
+              setForm({
+                ...form,
+                repeat,
+                nextDue: repeat && !form.nextDue ? addRepeat(form.doneOn ?? today(), repeat) : form.nextDue,
+              })
+            }
+          />
+        </Field>
         <Field label={t("maintenance.cost")} optional>
           <Input
             inputMode="decimal"
@@ -222,62 +233,6 @@ const EntryDialog = ({
           <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
         </Field>
       </form>
-    </Dialog>
-  );
-};
-
-/** Records a due task as done today, and optionally when it's next due. */
-const DoneDialog = ({ entry, onClose }: { entry: Maintenance | null; onClose: () => void }) => {
-  const { t } = useTranslation();
-  const invalidate = useInvalidate();
-  const [next, setNext] = useState<number | null>(12);
-  const finish = async () => {
-    if (!entry) return;
-    try {
-      const done = today();
-      // The done entry stays in the log; a repeat is a new entry.
-      await api.updateMaintenance(entry.id, { ...entry, doneOn: done, nextDue: null });
-      if (next)
-        await api.addMaintenance(entry.thingId, { ...entry, doneOn: null, nextDue: addMonths(done, next), cost: null });
-      invalidate();
-      onClose();
-    } catch (e) {
-      toast.error(errorMessage(e));
-    }
-  };
-  return (
-    <Dialog
-      open={entry !== null}
-      onOpenChange={(o) => !o && onClose()}
-      title={t("maintenance.doneTitle", { title: entry?.title ?? "" })}
-      size="sm"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button onClick={finish}>
-            <Check /> {t("maintenance.markDone")}
-          </Button>
-        </>
-      }
-    >
-      <p className="text-sm text-fg-muted">{t("maintenance.repeat")}</p>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {[null, 1, 3, 6, 12, 24].map((m) => (
-          <button
-            key={m ?? 0}
-            type="button"
-            onClick={() => setNext(m)}
-            className={cn(
-              "cursor-pointer rounded-lg border px-3 py-1.5 text-sm",
-              next === m ? "border-primary bg-primary-soft/60 text-primary" : "border-border text-fg-muted",
-            )}
-          >
-            {m === null ? t("maintenance.noRepeat") : t("maintenance.inMonths", { count: m })}
-          </button>
-        ))}
-      </div>
     </Dialog>
   );
 };

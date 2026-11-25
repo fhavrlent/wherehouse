@@ -20,6 +20,7 @@ const page = <P extends object>(load: () => Promise<ComponentType<P>>) =>
 
 // Pages other than the home page are downloaded when first visited.
 export const Login = page(() => import("./Login").then((m) => m.Login));
+export const MaintenancePage = page(() => import("./Maintenance").then((m) => m.MaintenancePage));
 export const Settings = page(() => import("./Settings").then((m) => m.Settings));
 export const ThingPage = page(() => import("./Thing").then((m) => m.ThingPage));
 export const PlaceRedirect = page(() => import("./Thing").then((m) => m.PlaceRedirect));
