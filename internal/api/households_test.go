@@ -164,6 +164,10 @@ func TestKindNamesAreUnique(t *testing.T) {
 	mustCall(t, h, c, "PUT", fmt.Sprintf("/api/kinds/%d", box.ID), `{"name":"Crate","icon":"package","isPlace":true}`, 200)
 	mustCall(t, h, c, "PUT", fmt.Sprintf("/api/kinds/%d", tool.ID), `{"name":"Box","icon":"hammer"}`, 200)
 	mustCall(t, h, c, "POST", "/api/kinds", `{"name":"crate","icon":"package"}`, 400)
+	// Clearing the rename brings back "Box", which the other kind now has.
+	mustCall(t, h, c, "PUT", fmt.Sprintf("/api/kinds/%d", box.ID), `{"name":"  ","icon":"package","isPlace":true}`, 400)
+	mustCall(t, h, c, "PUT", fmt.Sprintf("/api/kinds/%d", tool.ID), `{"name":"Toolbox","icon":"hammer"}`, 200)
+	mustCall(t, h, c, "PUT", fmt.Sprintf("/api/kinds/%d", box.ID), `{"name":"","icon":"package","isPlace":true}`, 200)
 }
 
 // Deleting a kind in use moves what is of it to another kind.

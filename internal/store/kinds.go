@@ -116,6 +116,9 @@ type KindInput struct {
 	Icon     string `json:"icon"`
 	IsPlace  bool   `json:"isPlace"`
 	Position int    `json:"position"`
+	// UniqueName refuses a name another kind shows as. People's changes set
+	// it; a backup or import with two kinds of one name still comes in.
+	UniqueName bool `json:"-"`
 }
 
 func (s *Store) CreateKind(ctx context.Context, hh int64, in KindInput) (*Kind, error) {
@@ -130,6 +133,11 @@ func (s *Store) CreateKind(ctx context.Context, hh int64, in KindInput) (*Kind, 
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		if err := checkIcon(ctx, tx, hh, in.Icon); err != nil {
 			return err
+		}
+		if in.UniqueName {
+			if err := checkKindNames(ctx, tx, hh, 0, []string{in.Name}); err != nil {
+				return err
+			}
 		}
 		var count, next int
 		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(MAX(position) + 1, 0) FROM kinds WHERE household_id = ?`, hh).
@@ -178,7 +186,8 @@ func (s *Store) UpdateKind(ctx context.Context, hh, id int64, in KindInput) (*Ki
 	}
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		var key sql.NullString
-		if err := tx.QueryRowContext(ctx, `SELECT key FROM kinds WHERE id = ? AND household_id = ?`, id, hh).Scan(&key); err != nil {
+		var name string
+		if err := tx.QueryRowContext(ctx, `SELECT key, name FROM kinds WHERE id = ? AND household_id = ?`, id, hh).Scan(&key, &name); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrNotFound
 			}
@@ -186,6 +195,14 @@ func (s *Store) UpdateKind(ctx context.Context, hh, id int64, in KindInput) (*Ki
 		}
 		if in.Name == "" && !key.Valid {
 			return invalid("kindName", nil)
+		}
+		// A kind keeps a name it already shows as, so one of two kinds named
+		// alike can still get a new icon. A built-in kind whose new name is
+		// cleared shows its built-in names again, which must be free.
+		if newNames := shownNames(key.String, in.Name); in.UniqueName && !sameNames(newNames, shownNames(key.String, name)) {
+			if err := checkKindNames(ctx, tx, hh, id, newNames); err != nil {
+				return err
+			}
 		}
 		if err := checkIcon(ctx, tx, hh, in.Icon); err != nil {
 			return err
@@ -206,33 +223,59 @@ func (s *Store) UpdateKind(ctx context.Context, hh, id int64, in KindInput) (*Ki
 	return s.getKind(ctx, hh, id)
 }
 
-// CheckKindName refuses a name another kind of the household shows as,
-// ignoring case: a kind named so, or a built-in kind not renamed whose name
-// is that in any language. except is the kind being renamed, or 0.
-func (s *Store) CheckKindName(ctx context.Context, hh, except int64, name string) error {
-	name = strings.TrimSpace(name)
-	kinds, err := s.ListKinds(ctx, hh)
+// shownNames are the names a kind shows as: its own, or a built-in kind's
+// in every language until renamed.
+func shownNames(key, name string) []string {
+	if name != "" || key == "" {
+		return []string{name}
+	}
+	var names []string
+	for _, lang := range i18n.Languages() {
+		names = append(names, i18n.T(lang, "kinds."+key, nil))
+	}
+	return names
+}
+
+func hasName(names []string, name string) bool {
+	for _, n := range names {
+		if strings.EqualFold(n, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// sameNames reports whether every name in a is in b, ignoring case.
+func sameNames(a, b []string) bool {
+	for _, n := range a {
+		if !hasName(b, n) {
+			return false
+		}
+	}
+	return true
+}
+
+// checkKindNames refuses names another kind of the household shows as,
+// ignoring case. except is the kind being renamed, or 0. Run in the
+// transaction that writes, so two requests can't both take a free name.
+func checkKindNames(ctx context.Context, q queryer, hh, except int64, names []string) error {
+	rows, err := q.QueryContext(ctx, `SELECT COALESCE(key, ''), name FROM kinds WHERE household_id = ? AND id != ?`, hh, except)
 	if err != nil {
 		return err
 	}
-	for _, k := range kinds {
-		if k.ID == except {
-			continue
-		}
-		names := []string{k.Name}
-		if k.Name == "" && k.Key != "" {
-			names = nil
-			for _, lang := range i18n.Languages() {
-				names = append(names, i18n.T(lang, "kinds."+k.Key, nil))
-			}
+	defer rows.Close()
+	for rows.Next() {
+		var key, name string
+		if err := rows.Scan(&key, &name); err != nil {
+			return err
 		}
 		for _, n := range names {
-			if strings.EqualFold(n, name) {
-				return invalid("kindExists", i18n.Args{"name": name})
+			if hasName(shownNames(key, name), n) {
+				return invalid("kindExists", i18n.Args{"name": n})
 			}
 		}
 	}
-	return nil
+	return rows.Err()
 }
 
 // DeleteKind deletes a kind. What is of it moves to the kind moveTo; with
