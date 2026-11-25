@@ -118,6 +118,8 @@ things of a place kind, and things holding something, are shown as places.
 | --- | --- |
 | `GET /api/me` | The token's owner. Use it to check a token. |
 | `GET /api/kinds` | The household's kinds. Built-in ones have a `key`: `building`, `room`, `furniture`, `box`, `thing`. |
+| `POST /api/kinds`, `PUT /api/kinds/{id}` | Add or change a kind: `{name, icon, isPlace, position}`. A name another kind shows as, in any language and in any case, answers 400 (`server.kindExists`). |
+| `DELETE /api/kinds/{id}?moveTo=<id>` | Delete a kind. Things of it become the kind `moveTo`; without it, only a kind nothing is of can be deleted. The built-in `thing` can't be. |
 | `GET /api/things` | Things, places first, then by name. Filters: `in=<id>` (directly inside), `inside=1` (with `in`: at any depth), `top=1` (in nothing), `unplaced=1` (in nothing and not places), `places=1` (only places, e.g. for a picker), `tag=<id>`, `archived=1`, `templates=1`, `recent=1` (newest change first), `limit=<n>`. Each has `path` (what it is in, outermost first), `contains` (how many things directly inside), `cover` (a photo ID), `label` and `tags`. |
 | `GET /api/search?q=…` | Things matching every word of `q` in their name, details, tags, custom fields, label code, kind or what they are in. `archived=1` searches archived things. |
 | `GET /api/things/{id}` | One thing with `photos`, `fields`, `attachments`, `maintenance`, `links` and `contents` (what is directly inside). |

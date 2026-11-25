@@ -141,3 +141,57 @@ func TestImportStatusAdminOnly(t *testing.T) {
 	mustCall(t, e.h, admin, "GET", "/api/import/homebox", "", 200)
 	mustCall(t, e.h, other, "GET", "/api/import/homebox", "", 403)
 }
+
+// A kind can't take a name another kind shows as, in any language.
+func TestKindNamesAreUnique(t *testing.T) {
+	h, c := newTestServer(t)
+	for _, taken := range []string{"Room", "místnost", " VĚC "} {
+		mustCall(t, h, c, "POST", "/api/kinds", fmt.Sprintf(`{"name":%q,"icon":"shapes"}`, taken), 400)
+	}
+	tool := decodeAs[store.Kind](t, mustCall(t, h, c, "POST", "/api/kinds", `{"name":"Power tool","icon":"drill"}`, 201))
+	mustCall(t, h, c, "POST", "/api/kinds", `{"name":"power TOOL","icon":"drill"}`, 400)
+	// Keeping its own name, or changing only its case, is fine.
+	mustCall(t, h, c, "PUT", fmt.Sprintf("/api/kinds/%d", tool.ID), `{"name":"Power tool","icon":"hammer"}`, 200)
+	mustCall(t, h, c, "PUT", fmt.Sprintf("/api/kinds/%d", tool.ID), `{"name":"Box","icon":"hammer"}`, 400)
+	// A built-in kind renamed frees its built-in name.
+	kinds := decodeAs[[]store.Kind](t, mustCall(t, h, c, "GET", "/api/kinds", "", 200))
+	var box store.Kind
+	for _, k := range kinds {
+		if k.Key == "box" {
+			box = k
+		}
+	}
+	mustCall(t, h, c, "PUT", fmt.Sprintf("/api/kinds/%d", box.ID), `{"name":"Crate","icon":"package","isPlace":true}`, 200)
+	mustCall(t, h, c, "PUT", fmt.Sprintf("/api/kinds/%d", tool.ID), `{"name":"Box","icon":"hammer"}`, 200)
+	mustCall(t, h, c, "POST", "/api/kinds", `{"name":"crate","icon":"package"}`, 400)
+	// Clearing the rename brings back "Box", which the other kind now has.
+	mustCall(t, h, c, "PUT", fmt.Sprintf("/api/kinds/%d", box.ID), `{"name":"  ","icon":"package","isPlace":true}`, 400)
+	mustCall(t, h, c, "PUT", fmt.Sprintf("/api/kinds/%d", tool.ID), `{"name":"Toolbox","icon":"hammer"}`, 200)
+	mustCall(t, h, c, "PUT", fmt.Sprintf("/api/kinds/%d", box.ID), `{"name":"","icon":"package","isPlace":true}`, 200)
+}
+
+// Deleting a kind in use moves what is of it to another kind.
+func TestDeleteKindMovesThings(t *testing.T) {
+	h, c := newTestServer(t)
+	kinds := decodeAs[[]store.Kind](t, mustCall(t, h, c, "GET", "/api/kinds", "", 200))
+	var room int64
+	for _, k := range kinds {
+		if k.Key == "room" {
+			room = k.ID
+		}
+	}
+	dup := decodeAs[store.Kind](t, mustCall(t, h, c, "POST", "/api/kinds", `{"name":"Chamber","icon":"door-open","isPlace":true}`, 201))
+	kitchen := add(t, h, c, fmt.Sprintf(`{"name":"Kitchen","kindId":%d}`, dup.ID))
+	mustCall(t, h, c, "DELETE", fmt.Sprintf("/api/kinds/%d", dup.ID), "", 400)
+	mustCall(t, h, c, "DELETE", fmt.Sprintf("/api/kinds/%d?moveTo=%d", dup.ID, dup.ID), "", 400)
+	mustCall(t, h, c, "DELETE", fmt.Sprintf("/api/kinds/%d?moveTo=99999", dup.ID), "", 400)
+	mustCall(t, h, c, "DELETE", fmt.Sprintf("/api/kinds/%d?moveTo=x", dup.ID), "", 400)
+	mustCall(t, h, c, "DELETE", fmt.Sprintf("/api/kinds/%d?moveTo=%d", dup.ID, room), "", 204)
+	got := decodeAs[thingResponse](t, mustCall(t, h, c, "GET", fmt.Sprintf("/api/things/%d", kitchen.ID), "", 200))
+	if got.Kind.ID != room {
+		t.Errorf("kitchen = %+v", got.Kind)
+	}
+	if n := len(decodeAs[[]store.Kind](t, mustCall(t, h, c, "GET", "/api/kinds", "", 200))); n != 5 {
+		t.Errorf("kinds left = %d", n)
+	}
+}

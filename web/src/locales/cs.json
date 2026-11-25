@@ -167,7 +167,12 @@
       "namePlaceholder": "Nový druh, např. Elektronářadí",
       "add": "Přidat druh",
       "rename": "Název druhu {{name}}",
-      "newName": "Název nového druhu"
+      "newName": "Název nového druhu",
+      "moveTo_one": "{{count}} věc je druhu {{name}}. Změnit ji na:",
+      "moveTo_few": "{{count}} věci jsou druhu {{name}}. Změnit je na:",
+      "moveTo_many": "{{count}} věci je druhu {{name}}. Změnit je na:",
+      "moveTo_other": "{{count}} věcí je druhu {{name}}. Změnit je na:",
+      "moveAndDelete": "Přesunout a smazat"
     },
     "templates": {
       "title": "Šablony",
@@ -302,7 +307,8 @@
     "paperlessFieldType": "Vlastní pole „{{name}}“ v Paperless existuje, ale není typu URL",
     "maintenanceRepeat": "Opakování může být každých 1–520 týdnů nebo 1–120 měsíců",
     "maintenanceDoneOn": "Zadejte, kdy se to udělalo",
-    "maintenanceNotDue": "Hotové jde označit jen to, co má termín"
+    "maintenanceNotDue": "Hotové jde označit jen to, co má termín",
+    "kindExists": "Druh {{name}} už existuje"
   },
   "signIn": {
     "unreachable": "Poskytovatel identity není dostupný. Zkuste to za chvíli znovu.",
